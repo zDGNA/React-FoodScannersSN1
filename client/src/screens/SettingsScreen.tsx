@@ -1,346 +1,333 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Alert, TextInput, Modal, ScrollView, ActivityIndicator } from "react-native";
-import { MainTabParamList } from '../types/NavigationTypes';
-import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
-import { useNavigation } from "@react-navigation/native";
-import { RootStackNavigationProp } from '../types/NavigationTypes';
-import { useUser } from '../context/UserContext';
-import Card from '../components/ui/card/index';
-import CardContent from '../components/ui/card/content';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, TextInput, Modal, ScrollView, ActivityIndicator, Switch } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
-import { Image } from "react-native";
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-type SettingsScreenProps = BottomTabScreenProps<MainTabParamList, 'Settings'>;
-
-const SettingsScreen = () => {
-    const rootNavigation = useNavigation<RootStackNavigationProp>();
-    const { user, username, setUsername: setGlobalUsername, setUser, logout } = useUser();
+type SettingsScreenProps = {
+    navigation: NativeStackNavigationProp<any>;
+};
+const SettingsScreen = ({ navigation }: SettingsScreenProps) => {
+    // User data - Mock (nanti dari context/state management)
+    const [user, setUser] = useState({
+        name: 'Guest User',
+        email: 'guest@foodscan.com',
+        isLoggedIn: false,
+    });
 
     const [showEditModal, setShowEditModal] = useState(false);
-    const [showPasswordModal, setShowPasswordModal] = useState(false);
+    const [showGoalModal, setShowGoalModal] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
 
-    const [editUsername, setEditUsername] = useState(username);
-    const [oldPassword, setOldPassword] = useState('');
-    const [newPassword, setNewPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
-    const [showOldPassword, setShowOldPassword] = useState(false);
-    const [showNewPassword, setShowNewPassword] = useState(false);
-    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    // Settings states
+    const [userName, setUserName] = useState(user.name);
+    const [dailyCalorieGoal, setDailyCalorieGoal] = useState('2000');
+    const [weightGoal, setWeightGoal] = useState('70');
+    const [notifications, setNotifications] = useState(true);
+    const [unitSystem, setUnitSystem] = useState('metric'); // metric or imperial
 
-    const handleEditUsername = async () => {
-        if (editUsername.trim().length < 3) {
-            Alert.alert('Error', 'Username minimal 3 karakter');
-            return;
-        }
-
-        setIsLoading(true);
-        try {
-            const response = await api.put('/users/update-username', {
-                userId: user?.id,
-                newUsername: editUsername
-            });
-
-            if (response.data.success) {
-                setGlobalUsername(editUsername);
-                if (user) setUser({ ...user, username: editUsername });
-                setShowEditModal(false);
-                Alert.alert('Success', 'Username berhasil diubah');
-            }
-        } catch (error: any) {
-            Alert.alert('Error', error.response?.data?.message || 'Gagal terhubung ke server');
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const handleChangePassword = async () => {
-        if (!oldPassword) {
-            Alert.alert('Error', 'Password lama harus diisi');
-            return;
-        }
-        if (!newPassword || !confirmPassword) {
-            Alert.alert('Error', 'Password baru dan konfirmasi harus diisi');
-            return;
-        }
-        if (newPassword.length < 6) {
-            Alert.alert('Error', 'Password minimal 6 karakter');
-            return;
-        }
-        if (newPassword !== confirmPassword) {
-            Alert.alert('Error', 'Password baru dan konfirmasi tidak cocok');
-            return;
-        }
-
-        setIsLoading(true);
-        try {
-            const response = await api.put('/users/update-password', {
-                userId: user?.id,
-                oldPassword: oldPassword,
-                newPassword: newPassword
-            });
-
-            if (response.data.success) {
-                setShowPasswordModal(false);
-                setOldPassword('');
-                setNewPassword('');
-                setConfirmPassword('');
-                Alert.alert('Success', 'Password berhasil diubah');
-            }
-        } catch (error: any) {
-            Alert.alert('Error', error.response?.data?.message || 'Password lama tidak sesuai');
-        } finally {
-            setIsLoading(false);
-        }
+    const handleLogin = () => {
+        navigation.navigate('LoginScreen');
     };
 
     const handleLogout = () => {
         Alert.alert(
             'Logout',
-            'Apakah Anda yakin ingin keluar?',
+            'Are you sure you want to logout?',
             [
-                { text: 'Batal', style: 'cancel' },
+                { text: 'Cancel', style: 'cancel' },
                 {
                     text: 'Logout',
                     style: 'destructive',
-                    onPress: async () => {
-                        await logout();
-                        rootNavigation.navigate('LoginScreen');
+                    onPress: () => {
+                        setUser({
+                            name: 'Guest User',
+                            email: 'guest@foodscan.com',
+                            isLoggedIn: false,
+                        });
+                        Alert.alert('Success', 'You have been logged out');
                     }
                 }
             ]
         );
     };
 
-    const resetEditModal = () => {
-        setEditUsername(username);
-        setShowEditModal(false);
+    const handleSaveProfile = () => {
+        setIsLoading(true);
+        setTimeout(() => {
+            setUser({ ...user, name: userName });
+            setIsLoading(false);
+            setShowEditModal(false);
+            Alert.alert('Success', 'Profile updated successfully');
+        }, 1000);
     };
 
-    const resetPasswordModal = () => {
-        setOldPassword('');
-        setNewPassword('');
-        setConfirmPassword('');
-        setShowOldPassword(false);
-        setShowNewPassword(false);
-        setShowConfirmPassword(false);
-        setShowPasswordModal(false);
+    const handleSaveGoals = () => {
+        setIsLoading(true);
+        setTimeout(() => {
+            setIsLoading(false);
+            setShowGoalModal(false);
+            Alert.alert('Success', 'Goals updated successfully');
+        }, 1000);
     };
 
     return (
         <SafeAreaView style={styles.container}>
-            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+                {/* Header */}
                 <View style={styles.header}>
-                    <Text style={styles.headerTitle}>Profil Saya</Text>
+                    <Text style={styles.headerTitle}>Profile & Settings</Text>
                 </View>
 
-                <View style={styles.content}>
-                    <Card style={styles.profileCard}>
-                        <CardContent style={styles.cardContentStyle}>
-                            <View style={styles.profileHeader}>
-                                <Image
-                                    source={require('../assets/profile-picture.jpg')}
-                                    style={styles.profileImage}
-                                />
-                                <View style={styles.userInfo}>
-                                    <Text style={styles.usernameDisplay}>{username}</Text>
-                                    <Text style={styles.roleDisplay}>{user?.role || 'Administrator HRD'}</Text>
-                                    <Text style={styles.emailDisplay}>{user?.email || 'admin@perusahaan.com'}</Text>
-                                </View>
+                {/* Profile Card */}
+                <View style={styles.profileCard}>
+                    <View style={styles.avatarContainer}>
+                        <View style={styles.avatar}>
+                            <Ionicons name="person" size={40} color="#082374" />
+                        </View>
+                        {user.isLoggedIn && (
+                            <View style={styles.verifiedBadge}>
+                                <Ionicons name="checkmark-circle" size={20} color="#4ade80" />
                             </View>
-                        </CardContent>
-                    </Card>
+                        )}
+                    </View>
+                    <Text style={styles.userName}>{user.name}</Text>
+                    <Text style={styles.userEmail}>{user.email}</Text>
 
-                    <Card style={styles.settingsCard}>
-                        <CardContent style={styles.cardContentStyle}>
-                            <Text style={styles.settingsTitle}>Pengaturan Akun</Text>
+                    {!user.isLoggedIn ? (
+                        <TouchableOpacity
+                            style={styles.loginButton}
+                            onPress={handleLogin}
+                        >
+                            <Text style={styles.loginButtonText}>Login to Continue</Text>
+                        </TouchableOpacity>
+                    ) : (
+                        <TouchableOpacity
+                            style={styles.editProfileButton}
+                            onPress={() => setShowEditModal(true)}
+                        >
+                            <Ionicons name="create-outline" size={16} color="#082374" />
+                            <Text style={styles.editProfileText}>Edit Profile</Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
 
-                            <TouchableOpacity
-                                style={styles.settingItem}
-                                onPress={() => setShowEditModal(true)}
-                            >
-                                <View style={styles.settingItemLeft}>
-                                    <View style={styles.settingIcon}>
-                                        <Ionicons name="person-outline" size={24} color="#1d04d9ff" />
-                                    </View>
-                                    <View style={styles.settingText}>
-                                        <Text style={styles.settingLabel}>Ubah Username</Text>
-                                        <Text style={styles.settingValue}>{username}</Text>
-                                    </View>
-                                </View>
-                                <Ionicons name="chevron-forward" size={24} color="#94a3b8" />
-                            </TouchableOpacity>
+                {/* Health Goals Section */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Health Goals</Text>
 
-                            <View style={styles.divider} />
+                    <TouchableOpacity
+                        style={styles.settingItem}
+                        onPress={() => setShowGoalModal(true)}
+                    >
+                        <View style={styles.settingItemLeft}>
+                            <View style={[styles.settingIcon, { backgroundColor: '#fef3c7' }]}>
+                                <Ionicons name="flame" size={24} color="#f59e0b" />
+                            </View>
+                            <View style={styles.settingText}>
+                                <Text style={styles.settingLabel}>Daily Calorie Goal</Text>
+                                <Text style={styles.settingValue}>{dailyCalorieGoal} kcal</Text>
+                            </View>
+                        </View>
+                        <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
+                    </TouchableOpacity>
 
-                            <TouchableOpacity
-                                style={styles.settingItem}
-                                onPress={() => setShowPasswordModal(true)}
-                            >
-                                <View style={styles.settingItemLeft}>
-                                    <View style={styles.settingIcon}>
-                                        <Ionicons name="lock-closed-outline" size={24} color="#1d04d9ff" />
-                                    </View>
-                                    <View style={styles.settingText}>
-                                        <Text style={styles.settingLabel}>Ubah Password</Text>
-                                        <Text style={styles.settingValue}>••••••••</Text>
-                                    </View>
-                                </View>
-                                <Ionicons name="chevron-forward" size={24} color="#94a3b8" />
-                            </TouchableOpacity>
-                        </CardContent>
-                    </Card>
+                    <TouchableOpacity
+                        style={styles.settingItem}
+                        onPress={() => setShowGoalModal(true)}
+                    >
+                        <View style={styles.settingItemLeft}>
+                            <View style={[styles.settingIcon, { backgroundColor: '#dbeafe' }]}>
+                                <Ionicons name="trending-down" size={24} color="#3b82f6" />
+                            </View>
+                            <View style={styles.settingText}>
+                                <Text style={styles.settingLabel}>Target Weight</Text>
+                                <Text style={styles.settingValue}>{weightGoal} kg</Text>
+                            </View>
+                        </View>
+                        <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
+                    </TouchableOpacity>
+                </View>
 
-                    <Card style={styles.infoCard}>
-                        <CardContent style={styles.cardContentStyle}>
-                            <Text style={styles.companyName}>Tentang Perusahaan</Text>
-                            <Text style={styles.profileText}>
-                                Perusahaan kami berkomitmen untuk memberikan layanan terbaik kepada pelanggan.
-                                Didirikan pada tahun 2025, kami selalu berusaha meningkatkan kualitas produk
-                                dan layanan untuk memenuhi kebutuhan Anda.
-                            </Text>
-                        </CardContent>
-                    </Card>
+                {/* Preferences Section */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Preferences</Text>
 
+                    <View style={styles.settingItem}>
+                        <View style={styles.settingItemLeft}>
+                            <View style={[styles.settingIcon, { backgroundColor: '#fce7f3' }]}>
+                                <Ionicons name="notifications" size={24} color="#ec4899" />
+                            </View>
+                            <View style={styles.settingText}>
+                                <Text style={styles.settingLabel}>Meal Reminders</Text>
+                                <Text style={styles.settingValue}>Get notified for meals</Text>
+                            </View>
+                        </View>
+                        <Switch
+                            value={notifications}
+                            onValueChange={setNotifications}
+                            trackColor={{ false: '#e0e0e0', true: '#a0b0ff' }}
+                            thumbColor={notifications ? '#082374' : '#f4f3f4'}
+                        />
+                    </View>
+
+                    <TouchableOpacity style={styles.settingItem}>
+                        <View style={styles.settingItemLeft}>
+                            <View style={[styles.settingIcon, { backgroundColor: '#e0f2fe' }]}>
+                                <Ionicons name="scale" size={24} color="#0ea5e9" />
+                            </View>
+                            <View style={styles.settingText}>
+                                <Text style={styles.settingLabel}>Unit System</Text>
+                                <Text style={styles.settingValue}>
+                                    {unitSystem === 'metric' ? 'Metric (kg, cm)' : 'Imperial (lb, in)'}
+                                </Text>
+                            </View>
+                        </View>
+                        <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
+                    </TouchableOpacity>
+                </View>
+
+                {/* App Section */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>App</Text>
+
+                    <TouchableOpacity style={styles.settingItem}>
+                        <View style={styles.settingItemLeft}>
+                            <View style={[styles.settingIcon, { backgroundColor: '#f3e8ff' }]}>
+                                <Ionicons name="help-circle" size={24} color="#a855f7" />
+                            </View>
+                            <Text style={styles.settingLabel}>Help & Support</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.settingItem}>
+                        <View style={styles.settingItemLeft}>
+                            <View style={[styles.settingIcon, { backgroundColor: '#e0e7ff' }]}>
+                                <Ionicons name="shield-checkmark" size={24} color="#6366f1" />
+                            </View>
+                            <Text style={styles.settingLabel}>Privacy Policy</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.settingItem}>
+                        <View style={styles.settingItemLeft}>
+                            <View style={[styles.settingIcon, { backgroundColor: '#fef3c7' }]}>
+                                <Ionicons name="star" size={24} color="#f59e0b" />
+                            </View>
+                            <Text style={styles.settingLabel}>Rate This App</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
+                    </TouchableOpacity>
+                </View>
+
+                {/* Logout Button */}
+                {user.isLoggedIn && (
                     <TouchableOpacity
                         style={styles.logoutButton}
                         onPress={handleLogout}
                     >
-                        <Ionicons name="log-out-outline" size={24} color="white" />
+                        <Ionicons name="log-out-outline" size={20} color="#ffffff" />
                         <Text style={styles.logoutButtonText}>Logout</Text>
                     </TouchableOpacity>
+                )}
+
+                {/* App Version */}
+                <View style={styles.versionContainer}>
+                    <Text style={styles.versionText}>FoodScan AI</Text>
+                    <Text style={styles.versionNumber}>Version 1.0.0</Text>
                 </View>
 
-                <View style={styles.footer}>
-                    <Text style={styles.footerText}>
-                        © {new Date().getFullYear()} PT Tech Innovation Indonesia
-                    </Text>
-                </View>
+                <View style={{ height: 30 }} />
             </ScrollView>
 
+            {/* Edit Profile Modal */}
             <Modal
                 visible={showEditModal}
                 transparent
                 animationType="slide"
-                onRequestClose={resetEditModal}
+                onRequestClose={() => setShowEditModal(false)}
             >
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
                         <View style={styles.modalHeader}>
-                            <TouchableOpacity onPress={resetEditModal}>
-                                <Text style={styles.modalHeaderButton}>Batal</Text>
+                            <TouchableOpacity onPress={() => setShowEditModal(false)}>
+                                <Text style={styles.modalHeaderButton}>Cancel</Text>
                             </TouchableOpacity>
-                            <Text style={styles.modalTitle}>Ubah Username</Text>
-                            <TouchableOpacity onPress={handleEditUsername} disabled={isLoading}>
-                                {isLoading ? <ActivityIndicator size="small" color="#1d04d9ff" /> : <Text style={styles.modalHeaderButtonSave}>Simpan</Text>}
+                            <Text style={styles.modalTitle}>Edit Profile</Text>
+                            <TouchableOpacity onPress={handleSaveProfile} disabled={isLoading}>
+                                {isLoading ? (
+                                    <ActivityIndicator size="small" color="#082374" />
+                                ) : (
+                                    <Text style={styles.modalHeaderButtonSave}>Save</Text>
+                                )}
                             </TouchableOpacity>
                         </View>
 
                         <View style={styles.modalBody}>
-                            <Text style={styles.inputLabel}>Username Baru</Text>
+                            <Text style={styles.inputLabel}>Full Name</Text>
                             <TextInput
                                 style={styles.textInput}
-                                placeholder="Masukkan username baru"
+                                placeholder="Enter your name"
                                 placeholderTextColor="#94a3b8"
-                                value={editUsername}
-                                onChangeText={setEditUsername}
+                                value={userName}
+                                onChangeText={setUserName}
                                 autoFocus
                             />
-                            <Text style={styles.inputHint}>
-                                Username minimal 3 karakter dan hanya dapat menggunakan huruf, angka, dan underscore.
-                            </Text>
                         </View>
                     </View>
                 </View>
             </Modal>
 
+            {/* Goals Modal */}
             <Modal
-                visible={showPasswordModal}
+                visible={showGoalModal}
                 transparent
                 animationType="slide"
-                onRequestClose={resetPasswordModal}
+                onRequestClose={() => setShowGoalModal(false)}
             >
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
                         <View style={styles.modalHeader}>
-                            <TouchableOpacity onPress={resetPasswordModal}>
-                                <Text style={styles.modalHeaderButton}>Batal</Text>
+                            <TouchableOpacity onPress={() => setShowGoalModal(false)}>
+                                <Text style={styles.modalHeaderButton}>Cancel</Text>
                             </TouchableOpacity>
-                            <Text style={styles.modalTitle}>Ubah Password</Text>
-                            <TouchableOpacity onPress={handleChangePassword} disabled={isLoading}>
-                                {isLoading ? <ActivityIndicator size="small" color="#1d04d9ff" /> : <Text style={styles.modalHeaderButtonSave}>Simpan</Text>}
+                            <Text style={styles.modalTitle}>Health Goals</Text>
+                            <TouchableOpacity onPress={handleSaveGoals} disabled={isLoading}>
+                                {isLoading ? (
+                                    <ActivityIndicator size="small" color="#082374" />
+                                ) : (
+                                    <Text style={styles.modalHeaderButtonSave}>Save</Text>
+                                )}
                             </TouchableOpacity>
                         </View>
 
                         <ScrollView style={styles.modalBody}>
-                            <Text style={styles.inputLabel}>Password Lama</Text>
-                            <View style={styles.passwordInputContainer}>
-                                <TextInput
-                                    style={styles.textInputPassword}
-                                    placeholder="Masukkan password lama"
-                                    placeholderTextColor="#94a3b8"
-                                    secureTextEntry={!showOldPassword}
-                                    value={oldPassword}
-                                    onChangeText={setOldPassword}
-                                />
-                                <TouchableOpacity
-                                    onPress={() => setShowOldPassword(!showOldPassword)}
-                                    style={styles.eyeIcon}
-                                >
-                                    <Ionicons
-                                        name={showOldPassword ? "eye-outline" : "eye-off-outline"}
-                                        size={20}
-                                        color="#94a3b8"
-                                    />
-                                </TouchableOpacity>
-                            </View>
-
-                            <Text style={[styles.inputLabel, { marginTop: 16 }]}>Password Baru</Text>
-                            <View style={styles.passwordInputContainer}>
-                                <TextInput
-                                    style={styles.textInputPassword}
-                                    placeholder="Masukkan password baru"
-                                    placeholderTextColor="#94a3b8"
-                                    secureTextEntry={!showNewPassword}
-                                    value={newPassword}
-                                    onChangeText={setNewPassword}
-                                />
-                                <TouchableOpacity
-                                    onPress={() => setShowNewPassword(!showNewPassword)}
-                                    style={styles.eyeIcon}
-                                >
-                                    <Ionicons
-                                        name={showNewPassword ? "eye-outline" : "eye-off-outline"}
-                                        size={20}
-                                        color="#94a3b8"
-                                    />
-                                </TouchableOpacity>
-                            </View>
-
-                            <Text style={[styles.inputLabel, { marginTop: 16 }]}>Konfirmasi Password</Text>
-                            <View style={styles.passwordInputContainer}>
-                                <TextInput
-                                    style={styles.textInputPassword}
-                                    placeholder="Konfirmasi password baru"
-                                    placeholderTextColor="#94a3b8"
-                                    secureTextEntry={!showConfirmPassword}
-                                    value={confirmPassword}
-                                    onChangeText={setConfirmPassword}
-                                />
-                                <TouchableOpacity
-                                    onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                                    style={styles.eyeIcon}
-                                >
-                                    <Ionicons
-                                        name={showConfirmPassword ? "eye-outline" : "eye-off-outline"}
-                                        size={20}
-                                        color="#94a3b8"
-                                    />
-                                </TouchableOpacity>
-                            </View>
+                            <Text style={styles.inputLabel}>Daily Calorie Goal</Text>
+                            <TextInput
+                                style={styles.textInput}
+                                placeholder="2000"
+                                placeholderTextColor="#94a3b8"
+                                value={dailyCalorieGoal}
+                                onChangeText={setDailyCalorieGoal}
+                                keyboardType="numeric"
+                            />
                             <Text style={styles.inputHint}>
-                                Password minimal 6 karakter.
+                                Recommended: 1800-2500 kcal per day
+                            </Text>
+
+                            <Text style={[styles.inputLabel, { marginTop: 20 }]}>Target Weight (kg)</Text>
+                            <TextInput
+                                style={styles.textInput}
+                                placeholder="70"
+                                placeholderTextColor="#94a3b8"
+                                value={weightGoal}
+                                onChangeText={setWeightGoal}
+                                keyboardType="numeric"
+                            />
+                            <Text style={styles.inputHint}>
+                                Your ideal weight goal
                             </Text>
                         </ScrollView>
                     </View>
@@ -353,104 +340,116 @@ const SettingsScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f8fafc',
-    },
-    scrollContent: {
-        flexGrow: 1,
+        backgroundColor: '#f5f5f5',
     },
     header: {
+        paddingHorizontal: 20,
         paddingTop: 20,
-        paddingHorizontal: 24,
-        paddingBottom: 20,
-        backgroundColor: '#f8fafc',
+        paddingBottom: 15,
+        backgroundColor: '#ffffff',
+        borderBottomWidth: 1,
+        borderBottomColor: '#e0e0e0',
     },
     headerTitle: {
-        fontSize: 30,
+        fontSize: 24,
         fontWeight: 'bold',
-        color: '#1d04d9ff',
-    },
-    content: {
-        flex: 1,
-        paddingHorizontal: 24,
-        paddingVertical: 16,
+        color: '#082374',
     },
     profileCard: {
-        width: '100%',
-        marginBottom: 20,
         backgroundColor: '#ffffff',
+        margin: 15,
         borderRadius: 20,
+        padding: 30,
+        alignItems: 'center',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 4,
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
         elevation: 3,
     },
-    profileImage: {
+    avatarContainer: {
+        position: 'relative',
+        marginBottom: 15,
+    },
+    avatar: {
         width: 80,
         height: 80,
         borderRadius: 40,
-        borderWidth: 3,
-        borderColor: '#1d04d9ff',
-        marginRight: 20,
-    },
-    profileSection: {
-        flexDirection: 'row',
+        backgroundColor: '#e0e7ff',
+        justifyContent: 'center',
         alignItems: 'center',
     },
-    profileImageContainer: {
-        position: 'relative',
-        marginRight: 16,
+    verifiedBadge: {
+        position: 'absolute',
+        bottom: 0,
+        right: 0,
+        backgroundColor: '#ffffff',
+        borderRadius: 12,
     },
-    cardContentStyle: {
-        padding: 24,
-    },
-    profileHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    avatarContainer: {
-        marginRight: 20,
-    },
-    userInfo: {
-        flex: 1,
-    },
-    usernameDisplay: {
-        fontSize: 20,
-        fontWeight: '700',
+    userName: {
+        fontSize: 22,
+        fontWeight: 'bold',
         color: '#333',
         marginBottom: 4,
     },
-    roleDisplay: {
+    userEmail: {
         fontSize: 14,
-        color: '#64748b',
-        marginBottom: 2,
+        color: '#666',
+        marginBottom: 15,
     },
-    emailDisplay: {
-        fontSize: 12,
-        color: '#94a3b8',
+    loginButton: {
+        backgroundColor: '#082374',
+        paddingHorizontal: 30,
+        paddingVertical: 12,
+        borderRadius: 12,
+        marginTop: 10,
     },
-    settingsCard: {
-        width: '100%',
-        marginBottom: 20,
+    loginButtonText: {
+        color: '#ffffff',
+        fontSize: 15,
+        fontWeight: 'bold',
+    },
+    editProfileButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#e0e7ff',
+        backgroundColor: '#f8faff',
+    },
+    editProfileText: {
+        color: '#082374',
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    section: {
         backgroundColor: '#ffffff',
+        marginHorizontal: 15,
+        marginBottom: 15,
         borderRadius: 16,
+        padding: 20,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
         shadowRadius: 4,
-        elevation: 3,
+        elevation: 2,
     },
-    settingsTitle: {
-        fontSize: 18,
-        fontWeight: '700',
+    sectionTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
         color: '#333',
-        marginBottom: 16,
+        marginBottom: 15,
     },
     settingItem: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f5f5f5',
     },
     settingItemLeft: {
         flexDirection: 'row',
@@ -458,66 +457,35 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     settingIcon: {
-        width: 48,
-        height: 48,
+        width: 44,
+        height: 44,
         borderRadius: 12,
-        backgroundColor: '#e0e7ff',
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 16,
+        marginRight: 12,
     },
     settingText: {
         flex: 1,
     },
     settingLabel: {
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: '600',
         color: '#333',
-        marginBottom: 4,
+        marginBottom: 2,
     },
     settingValue: {
         fontSize: 13,
-        color: '#94a3b8',
-    },
-    divider: {
-        height: 1,
-        backgroundColor: '#e2e8f0',
-        marginVertical: 12,
-    },
-    infoCard: {
-        width: '100%',
-        marginBottom: 20,
-        backgroundColor: '#ffffff',
-        borderRadius: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 4,
-        elevation: 3,
-    },
-    companyName: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#333',
-        marginBottom: 12,
-        paddingBottom: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#e2e8f0',
-    },
-    profileText: {
-        fontSize: 14,
-        lineHeight: 22,
-        color: '#475569',
+        color: '#666',
     },
     logoutButton: {
         flexDirection: 'row',
-        backgroundColor: '#ef4444',
-        paddingVertical: 16,
-        paddingHorizontal: 20,
-        borderRadius: 12,
-        justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 30,
+        justifyContent: 'center',
+        backgroundColor: '#ef4444',
+        marginHorizontal: 15,
+        paddingVertical: 14,
+        borderRadius: 12,
+        gap: 8,
         shadowColor: '#ef4444',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
@@ -525,21 +493,23 @@ const styles = StyleSheet.create({
         elevation: 5,
     },
     logoutButtonText: {
-        color: 'white',
-        fontSize: 16,
-        fontWeight: '600',
-        marginLeft: 8,
+        color: '#ffffff',
+        fontSize: 15,
+        fontWeight: 'bold',
     },
-    footer: {
-        padding: 20,
+    versionContainer: {
         alignItems: 'center',
-        borderTopWidth: 1,
-        borderTopColor: '#e2e8f0',
-        backgroundColor: '#ffffff',
+        paddingVertical: 20,
     },
-    footerText: {
+    versionText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#082374',
+        marginBottom: 4,
+    },
+    versionNumber: {
         fontSize: 12,
-        color: '#94a3b8',
+        color: '#999',
     },
     modalOverlay: {
         flex: 1,
@@ -550,7 +520,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#ffffff',
         borderTopLeftRadius: 24,
         borderTopRightRadius: 24,
-        maxHeight: '80%',
+        maxHeight: '70%',
         paddingBottom: 20,
     },
     modalHeader: {
@@ -575,7 +545,7 @@ const styles = StyleSheet.create({
     },
     modalHeaderButtonSave: {
         fontSize: 16,
-        color: '#1d04d9ff',
+        color: '#082374',
         fontWeight: '700',
     },
     modalBody: {
@@ -596,31 +566,12 @@ const styles = StyleSheet.create({
         paddingVertical: 14,
         fontSize: 16,
         color: '#333',
-        marginBottom: 12,
-    },
-    passwordInputContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#e2e8f0',
-        borderRadius: 10,
-        paddingRight: 12,
-        marginBottom: 12,
-    },
-    textInputPassword: {
-        flex: 1,
-        paddingHorizontal: 16,
-        paddingVertical: 14,
-        fontSize: 16,
-        color: '#333',
-    },
-    eyeIcon: {
-        padding: 8,
+        marginBottom: 8,
     },
     inputHint: {
         fontSize: 12,
         color: '#94a3b8',
-        marginTop: 8,
+        marginBottom: 12,
     },
 });
 

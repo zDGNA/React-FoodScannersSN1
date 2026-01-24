@@ -4,8 +4,8 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import Ionicons from "@react-native-vector-icons/ionicons";
 
+import SplashScreen from "./screens/SplashScreen";
 import HomeScreen from "./screens/HomeScreen";
-// import LoginScreen from "./screens/LoginScreen";
 import DetailScanScreen from "./screens/DetailScanScreen";
 import ScanHistoryScreen from "./screens/ScanHistoryScreen";
 import SettingsScreen from "./screens/SettingsScreen";
@@ -14,18 +14,25 @@ import CameraScannerScreen from "./screens/CameraScannerScreen";
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
-
-// --- Bagian Tab (Main screen setelah login)
+// --- Tab Navigator (Main screens)
 const MainTab = () => {
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: "#082374ff", /* Warna biru gelap sesuai tema Anda */
+        tabBarActiveTintColor: "#082374",
         tabBarInactiveTintColor: "gray",
         tabBarStyle: {
           height: 60,
           paddingBottom: 10,
+          paddingTop: 5,
+          borderTopWidth: 1,
+          borderTopColor: '#e0e0e0',
+          backgroundColor: '#ffffff',
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '600',
         },
       }}
     >
@@ -33,8 +40,9 @@ const MainTab = () => {
         name="HomeTab"
         component={HomeScreen}
         options={{
-          tabBarIcon: ({ color }) => (
-            <Ionicons name="home-outline" size={24} color={color} />
+          tabBarLabel: 'Home',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="home-outline" size={size} color={color} />
           ),
         }}
       />
@@ -42,8 +50,19 @@ const MainTab = () => {
         name="Scanner"
         component={CameraScannerScreen}
         options={{
-          tabBarIcon: ({ color }) => (
-            <Ionicons name="scan-outline" size={24} color={color} />
+          tabBarLabel: 'Scan',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="scan-circle" size={size + 4} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="History"
+        component={ScanHistoryScreen}
+        options={{
+          tabBarLabel: 'History',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="time-outline" size={size} color={color} />
           ),
         }}
       />
@@ -51,8 +70,9 @@ const MainTab = () => {
         name="Settings"
         component={SettingsScreen}
         options={{
-          tabBarIcon: ({ color }) => (
-            <Ionicons name="settings-outline" size={24} color={color} />
+          tabBarLabel: 'Profile',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="person-outline" size={size} color={color} />
           ),
         }}
       />
@@ -60,20 +80,30 @@ const MainTab = () => {
   );
 };
 
-
-// --- Stack utama (Login → MainTab)
+// --- Root Stack Navigator
 const RootStack = () => {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false,
+        animation: 'fade',
+      }}
+      initialRouteName="Splash"
+    >
+      <Stack.Screen name="Splash" component={SplashScreen} />
       <Stack.Screen name="Main" component={MainTab} />
-
-
+      <Stack.Screen
+        name="DetailScanScreen"
+        component={DetailScanScreen as any}
+        options={{
+          animation: 'slide_from_bottom',
+        }}
+      />
     </Stack.Navigator>
   );
 };
 
-
-// --- Entry point utama aplikasi
+// --- Entry point
 const App = () => {
   return (
     <NavigationContainer>
