@@ -27,10 +27,12 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
     const handleFeatureClick = () => {
         setShowLoginModal(true);
     };
-
+    const scanFeatureClick = () => {
+        navigation.navigate('Scanner');
+    };
     return (
-        <ScrollView style={styles.container}>
-            <SafeAreaView>
+        <SafeAreaView style={styles.container}>
+            <ScrollView>
                 {/* Header */}
                 <View style={styles.header}>
                     <View style={styles.headerTop}>
@@ -38,7 +40,10 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
                             <Text style={styles.greeting}>Hello, Guest! 👋</Text>
                             <Text style={styles.subtitle}>Track your nutrition today</Text>
                         </View>
-                        <TouchableOpacity style={styles.profileIcon}>
+                        <TouchableOpacity
+                            style={styles.profileIcon}
+                            onPress={handleFeatureClick}
+                        >
                             <Ionicons name="person-circle-outline" size={40} color="#ffffff" />
                         </TouchableOpacity>
                     </View>
@@ -130,7 +135,7 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
                     {/* Scan Button - Large Central Button */}
                     <TouchableOpacity
                         style={styles.scanButton}
-                        onPress={handleFeatureClick}
+                        onPress={scanFeatureClick}
                     >
                         <View style={styles.scanButtonInner}>
                             <Ionicons name="scan-circle" size={60} color="#ffffff" />
@@ -176,7 +181,7 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
                         </TouchableOpacity>
                     </View>
                 </View>
-            </SafeAreaView>
+            </ScrollView>
 
             {/* Login/Register Modal */}
             <Modal
@@ -270,7 +275,7 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
                     </View>
                 </View>
             </Modal>
-        </ScrollView>
+        </SafeAreaView>
     );
 };
 
