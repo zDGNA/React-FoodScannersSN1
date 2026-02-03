@@ -19,9 +19,9 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
     const progress = dailyCalories / targetCalories;
 
     const nutritionData = {
-        carbs: { current: 180, target: 250 },
-        protein: { current: 65, target: 100 },
-        fat: { current: 45, target: 70 },
+        carbs: { current: 0, target: 250 },
+        protein: { current: 0, target: 100 },
+        fat: { current: 0, target: 70 },
     };
 
     const handleFeatureClick = () => {
@@ -161,9 +161,9 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
                             </View>
                             <View style={styles.mealInfo}>
                                 <Text style={styles.mealName}>Breakfast</Text>
-                                <Text style={styles.mealTime}>8:30 AM</Text>
+                                <Text style={styles.mealTime}>Time Not Set Yet</Text>
                             </View>
-                            <Text style={styles.mealCalories}>450 kcal</Text>
+                            <Text style={styles.mealCalories}>0 kcal</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
@@ -175,9 +175,9 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
                             </View>
                             <View style={styles.mealInfo}>
                                 <Text style={styles.mealName}>Lunch</Text>
-                                <Text style={styles.mealTime}>12:45 PM</Text>
+                                <Text style={styles.mealTime}>Time Not Set Yet</Text>
                             </View>
-                            <Text style={styles.mealCalories}>680 kcal</Text>
+                            <Text style={styles.mealCalories}>0 kcal</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
