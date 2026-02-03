@@ -1,9 +1,10 @@
 import React, { useState } from "react";
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Modal, Pressable } from "react-native";
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
-import { ProgressBar } from 'react-native-paper'; // Install: npm install react-native-paper
+import { ProgressBar } from 'react-native-paper';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import LoginModal from '../components/LoginModal';
 
 type HomeScreenProps = {
     navigation: NativeStackNavigationProp<any>;
@@ -11,25 +12,34 @@ type HomeScreenProps = {
 
 const HomeScreen = ({ navigation }: HomeScreenProps) => {
     const [showLoginModal, setShowLoginModal] = useState(false);
-    const [isLogin, setIsLogin] = useState(true); // Toggle between login/register
 
-    // Mock data untuk demo
-    const dailyCalories = 1847;
+    // Guest mode - semua data di set ke 0
+    const isGuest = true; // TODO: Nanti ganti dengan state dari AuthContext
+
+    const dailyCalories = isGuest ? 0 : 1847;
     const targetCalories = 2000;
     const progress = dailyCalories / targetCalories;
 
     const nutritionData = {
-        carbs: { current: 0, target: 250 },
-        protein: { current: 0, target: 100 },
-        fat: { current: 0, target: 70 },
+        carbs: { current: isGuest ? 0 : 180, target: 250 },
+        protein: { current: isGuest ? 0 : 65, target: 100 },
+        fat: { current: isGuest ? 0 : 45, target: 70 },
     };
 
     const handleFeatureClick = () => {
-        setShowLoginModal(true);
+        if (isGuest) {
+            setShowLoginModal(true);
+        }
     };
-    const scanFeatureClick = () => {
-        navigation.navigate('Scanner');
+
+    const handleScanClick = () => {
+        if (isGuest) {
+            setShowLoginModal(true);
+        } else {
+            navigation.navigate('Scanner');
+        }
     };
+
     return (
         <SafeAreaView style={styles.container}>
             <ScrollView>
@@ -51,6 +61,23 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
 
                 {/* Main Content */}
                 <View style={styles.content}>
+                    {/* Guest Banner - Optional */}
+                    {isGuest && (
+                        <TouchableOpacity
+                            style={styles.guestBanner}
+                            onPress={() => setShowLoginModal(true)}
+                        >
+                            <Ionicons name="information-circle" size={24} color="#082374" />
+                            <View style={styles.guestBannerText}>
+                                <Text style={styles.guestBannerTitle}>Guest Mode</Text>
+                                <Text style={styles.guestBannerSubtitle}>
+                                    Login to start tracking your nutrition
+                                </Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={20} color="#082374" />
+                        </TouchableOpacity>
+                    )}
+
                     {/* Calorie Progress Card */}
                     <TouchableOpacity
                         style={styles.calorieCard}
@@ -68,7 +95,7 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
 
                         <ProgressBar
                             progress={progress}
-                            color="#4ade80"
+                            color={isGuest ? "#e0e0e0" : "#4ade80"}
                             style={styles.progressBar}
                         />
 
@@ -94,7 +121,7 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
                             </Text>
                             <ProgressBar
                                 progress={nutritionData.carbs.current / nutritionData.carbs.target}
-                                color="#fbbf24"
+                                color={isGuest ? "#e0e0e0" : "#fbbf24"}
                                 style={styles.nutrientBar}
                             />
                         </View>
@@ -110,7 +137,7 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
                             </Text>
                             <ProgressBar
                                 progress={nutritionData.protein.current / nutritionData.protein.target}
-                                color="#f87171"
+                                color={isGuest ? "#e0e0e0" : "#f87171"}
                                 style={styles.nutrientBar}
                             />
                         </View>
@@ -126,7 +153,7 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
                             </Text>
                             <ProgressBar
                                 progress={nutritionData.fat.current / nutritionData.fat.target}
-                                color="#60a5fa"
+                                color={isGuest ? "#e0e0e0" : "#60a5fa"}
                                 style={styles.nutrientBar}
                             />
                         </View>
@@ -135,7 +162,7 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
                     {/* Scan Button - Large Central Button */}
                     <TouchableOpacity
                         style={styles.scanButton}
-                        onPress={scanFeatureClick}
+                        onPress={handleScanClick}
                     >
                         <View style={styles.scanButtonInner}>
                             <Ionicons name="scan-circle" size={60} color="#ffffff" />
@@ -152,129 +179,58 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
                             </TouchableOpacity>
                         </View>
 
-                        <TouchableOpacity
-                            style={styles.mealItem}
-                            onPress={handleFeatureClick}
-                        >
-                            <View style={styles.mealImagePlaceholder}>
-                                <Text style={styles.mealEmoji}>🍳</Text>
+                        {isGuest ? (
+                            <View style={styles.emptyMeals}>
+                                <Ionicons name="restaurant-outline" size={48} color="#ccc" />
+                                <Text style={styles.emptyMealsText}>No meals yet</Text>
+                                <Text style={styles.emptyMealsSubtext}>
+                                    Login to start tracking your meals
+                                </Text>
                             </View>
-                            <View style={styles.mealInfo}>
-                                <Text style={styles.mealName}>Breakfast</Text>
-                                <Text style={styles.mealTime}>Time Not Set Yet</Text>
-                            </View>
-                            <Text style={styles.mealCalories}>0 kcal</Text>
-                        </TouchableOpacity>
+                        ) : (
+                            <>
+                                <TouchableOpacity
+                                    style={styles.mealItem}
+                                    onPress={handleFeatureClick}
+                                >
+                                    <View style={styles.mealImagePlaceholder}>
+                                        <Text style={styles.mealEmoji}>🍳</Text>
+                                    </View>
+                                    <View style={styles.mealInfo}>
+                                        <Text style={styles.mealName}>Breakfast</Text>
+                                        <Text style={styles.mealTime}>8:30 AM</Text>
+                                    </View>
+                                    <Text style={styles.mealCalories}>450 kcal</Text>
+                                </TouchableOpacity>
 
-                        <TouchableOpacity
-                            style={styles.mealItem}
-                            onPress={handleFeatureClick}
-                        >
-                            <View style={styles.mealImagePlaceholder}>
-                                <Text style={styles.mealEmoji}>🥗</Text>
-                            </View>
-                            <View style={styles.mealInfo}>
-                                <Text style={styles.mealName}>Lunch</Text>
-                                <Text style={styles.mealTime}>Time Not Set Yet</Text>
-                            </View>
-                            <Text style={styles.mealCalories}>0 kcal</Text>
-                        </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={styles.mealItem}
+                                    onPress={handleFeatureClick}
+                                >
+                                    <View style={styles.mealImagePlaceholder}>
+                                        <Text style={styles.mealEmoji}>🥗</Text>
+                                    </View>
+                                    <View style={styles.mealInfo}>
+                                        <Text style={styles.mealName}>Lunch</Text>
+                                        <Text style={styles.mealTime}>12:45 PM</Text>
+                                    </View>
+                                    <Text style={styles.mealCalories}>680 kcal</Text>
+                                </TouchableOpacity>
+                            </>
+                        )}
                     </View>
                 </View>
             </ScrollView>
 
-            {/* Login/Register Modal */}
-            <Modal
+            {/* Login Modal */}
+            <LoginModal
                 visible={showLoginModal}
-                transparent
-                animationType="slide"
-                onRequestClose={() => setShowLoginModal(false)}
-            >
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
-                        <TouchableOpacity
-                            style={styles.closeButton}
-                            onPress={() => setShowLoginModal(false)}
-                        >
-                            <Ionicons name="close" size={28} color="#333" />
-                        </TouchableOpacity>
-
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>
-                                {isLogin ? 'Welcome Back!' : 'Create Account'}
-                            </Text>
-                            <Text style={styles.modalSubtitle}>
-                                {isLogin
-                                    ? 'Sign in to track your nutrition'
-                                    : 'Start your health journey today'
-                                }
-                            </Text>
-                        </View>
-
-                        <View style={styles.modalBody}>
-                            {!isLogin && (
-                                <View style={styles.inputGroup}>
-                                    <Text style={styles.inputLabel}>Full Name</Text>
-                                    <View style={styles.inputContainer}>
-                                        <Ionicons name="person-outline" size={20} color="#666" />
-                                        <Text style={styles.inputPlaceholder}>Enter your name</Text>
-                                    </View>
-                                </View>
-                            )}
-
-                            <View style={styles.inputGroup}>
-                                <Text style={styles.inputLabel}>Email</Text>
-                                <View style={styles.inputContainer}>
-                                    <Ionicons name="mail-outline" size={20} color="#666" />
-                                    <Text style={styles.inputPlaceholder}>Enter your email</Text>
-                                </View>
-                            </View>
-
-                            <View style={styles.inputGroup}>
-                                <Text style={styles.inputLabel}>Password</Text>
-                                <View style={styles.inputContainer}>
-                                    <Ionicons name="lock-closed-outline" size={20} color="#666" />
-                                    <Text style={styles.inputPlaceholder}>Enter your password</Text>
-                                </View>
-                            </View>
-
-                            {isLogin && (
-                                <TouchableOpacity>
-                                    <Text style={styles.forgotPassword}>Forgot Password?</Text>
-                                </TouchableOpacity>
-                            )}
-
-                            <TouchableOpacity style={styles.primaryButton}>
-                                <Text style={styles.primaryButtonText}>
-                                    {isLogin ? 'Sign In' : 'Sign Up'}
-                                </Text>
-                            </TouchableOpacity>
-
-                            <View style={styles.divider}>
-                                <View style={styles.dividerLine} />
-                                <Text style={styles.dividerText}>OR</Text>
-                                <View style={styles.dividerLine} />
-                            </View>
-
-                            <TouchableOpacity style={styles.socialButton}>
-                                <Ionicons name="logo-google" size={20} color="#DB4437" />
-                                <Text style={styles.socialButtonText}>Continue with Google</Text>
-                            </TouchableOpacity>
-
-                            <View style={styles.switchAuth}>
-                                <Text style={styles.switchAuthText}>
-                                    {isLogin ? "Don't have an account? " : 'Already have an account? '}
-                                </Text>
-                                <TouchableOpacity onPress={() => setIsLogin(!isLogin)}>
-                                    <Text style={styles.switchAuthLink}>
-                                        {isLogin ? 'Sign Up' : 'Sign In'}
-                                    </Text>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-                    </View>
-                </View>
-            </Modal>
+                onClose={() => setShowLoginModal(false)}
+                onLoginSuccess={() => {
+                    // TODO: Handle successful login
+                    console.log('Login successful!');
+                }}
+            />
         </SafeAreaView>
     );
 };
@@ -319,6 +275,28 @@ const styles = StyleSheet.create({
         borderTopRightRadius: 30,
         padding: 20,
         minHeight: '100%',
+    },
+    guestBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#e0e7ff',
+        padding: 16,
+        borderRadius: 16,
+        marginBottom: 20,
+        gap: 12,
+    },
+    guestBannerText: {
+        flex: 1,
+    },
+    guestBannerTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#082374',
+        marginBottom: 4,
+    },
+    guestBannerSubtitle: {
+        fontSize: 13,
+        color: '#4338ca',
     },
     calorieCard: {
         backgroundColor: '#ffffff',
@@ -457,6 +435,21 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
     },
+    emptyMeals: {
+        alignItems: 'center',
+        paddingVertical: 40,
+    },
+    emptyMealsText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#999',
+        marginTop: 12,
+    },
+    emptyMealsSubtext: {
+        fontSize: 13,
+        color: '#ccc',
+        marginTop: 6,
+    },
     mealItem: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -493,131 +486,6 @@ const styles = StyleSheet.create({
         fontSize: 15,
         fontWeight: 'bold',
         color: '#082374',
-    },
-    // Modal Styles
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        justifyContent: 'flex-end',
-    },
-    modalContent: {
-        backgroundColor: '#ffffff',
-        borderTopLeftRadius: 30,
-        borderTopRightRadius: 30,
-        paddingTop: 20,
-        paddingBottom: 40,
-        paddingHorizontal: 24,
-        maxHeight: '90%',
-    },
-    closeButton: {
-        alignSelf: 'flex-end',
-        padding: 8,
-    },
-    modalHeader: {
-        alignItems: 'center',
-        marginBottom: 30,
-    },
-    modalTitle: {
-        fontSize: 28,
-        fontWeight: 'bold',
-        color: '#082374',
-        marginBottom: 8,
-    },
-    modalSubtitle: {
-        fontSize: 14,
-        color: '#666',
-    },
-    modalBody: {
-        width: '100%',
-    },
-    inputGroup: {
-        marginBottom: 20,
-    },
-    inputLabel: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#333',
-        marginBottom: 8,
-    },
-    inputContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#e0e0e0',
-        borderRadius: 12,
-        paddingHorizontal: 15,
-        paddingVertical: 15,
-        backgroundColor: '#f9f9f9',
-    },
-    inputPlaceholder: {
-        flex: 1,
-        marginLeft: 10,
-        fontSize: 15,
-        color: '#999',
-    },
-    forgotPassword: {
-        color: '#082374',
-        fontSize: 13,
-        fontWeight: '600',
-        textAlign: 'right',
-        marginTop: -10,
-        marginBottom: 20,
-    },
-    primaryButton: {
-        backgroundColor: '#082374',
-        borderRadius: 12,
-        paddingVertical: 16,
-        alignItems: 'center',
-        marginTop: 10,
-    },
-    primaryButtonText: {
-        color: '#ffffff',
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
-    divider: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginVertical: 25,
-    },
-    dividerLine: {
-        flex: 1,
-        height: 1,
-        backgroundColor: '#e0e0e0',
-    },
-    dividerText: {
-        marginHorizontal: 15,
-        color: '#999',
-        fontSize: 13,
-    },
-    socialButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: '#e0e0e0',
-        borderRadius: 12,
-        paddingVertical: 14,
-    },
-    socialButtonText: {
-        marginLeft: 10,
-        fontSize: 15,
-        fontWeight: '600',
-        color: '#333',
-    },
-    switchAuth: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        marginTop: 20,
-    },
-    switchAuthText: {
-        color: '#666',
-        fontSize: 14,
-    },
-    switchAuthLink: {
-        color: '#082374',
-        fontSize: 14,
-        fontWeight: 'bold',
     },
 });
 

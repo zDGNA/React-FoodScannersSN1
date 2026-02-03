@@ -3,6 +3,7 @@ import { StyleSheet, Text, View, ScrollView, TouchableOpacity, FlatList } from "
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import LoginModal from '../components/LoginModal';
 
 interface MealItem {
     id: string;
@@ -22,9 +23,13 @@ interface ScanHistoryScreenProps {
 const ScanHistoryScreen = ({ navigation }: ScanHistoryScreenProps) => {
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [selectedFilter, setSelectedFilter] = useState('All');
+    const [showLoginModal, setShowLoginModal] = useState(false);
 
-    // Mock data
-    const historyData: MealItem[] = [
+    // Guest mode - TODO: Nanti ganti dengan state dari AuthContext
+    const isGuest = true;
+
+    // Mock data - hanya ditampilkan jika bukan guest
+    const historyData: MealItem[] = isGuest ? [] : [
         {
             id: '1',
             date: '2026-01-25',
@@ -65,35 +70,33 @@ const ScanHistoryScreen = ({ navigation }: ScanHistoryScreenProps) => {
             image: '🐟',
             nutrients: { protein: 45, carbs: 22, fat: 25 }
         },
-        {
-            id: '5',
-            date: '2026-01-24',
-            mealType: 'Breakfast',
-            time: '09:00 AM',
-            foodName: 'Pancakes with Maple Syrup',
-            calories: 520,
-            image: '🥞',
-            nutrients: { protein: 12, carbs: 75, fat: 18 }
-        },
     ];
 
     const filters = ['All', 'Breakfast', 'Lunch', 'Dinner', 'Snack'];
 
     const todayData = historyData.filter(item => item.date === '2026-01-25');
-    const totalCalories = todayData.reduce((sum, item) => sum + item.calories, 0);
-    const totalProtein = todayData.reduce((sum, item) => sum + item.nutrients.protein, 0);
-    const totalCarbs = todayData.reduce((sum, item) => sum + item.nutrients.carbs, 0);
-    const totalFat = todayData.reduce((sum, item) => sum + item.nutrients.fat, 0);
+    const totalCalories = isGuest ? 0 : todayData.reduce((sum, item) => sum + item.calories, 0);
+    const totalProtein = isGuest ? 0 : todayData.reduce((sum, item) => sum + item.nutrients.protein, 0);
+    const totalCarbs = isGuest ? 0 : todayData.reduce((sum, item) => sum + item.nutrients.carbs, 0);
+    const totalFat = isGuest ? 0 : todayData.reduce((sum, item) => sum + item.nutrients.fat, 0);
 
     const filteredData = selectedFilter === 'All'
         ? historyData
         : historyData.filter(item => item.mealType === selectedFilter);
 
+    const handleCalendarClick = () => {
+        if (isGuest) {
+            setShowLoginModal(true);
+        } else {
+            // TODO: Open date picker
+            console.log('Open calendar picker');
+        }
+    };
+
     const renderMealItem = ({ item }: { item: MealItem }) => (
         <TouchableOpacity
             style={styles.mealCard}
             onPress={() => {
-                // Navigate to detail if needed
                 console.log('View meal detail:', item.id);
             }}
         >
@@ -128,7 +131,10 @@ const ScanHistoryScreen = ({ navigation }: ScanHistoryScreenProps) => {
             {/* Header */}
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>Meal History</Text>
-                <TouchableOpacity style={styles.calendarButton}>
+                <TouchableOpacity
+                    style={styles.calendarButton}
+                    onPress={handleCalendarClick}
+                >
                     <Ionicons name="calendar-outline" size={24} color="#082374" />
                 </TouchableOpacity>
             </View>
@@ -138,7 +144,13 @@ const ScanHistoryScreen = ({ navigation }: ScanHistoryScreenProps) => {
                 <View style={styles.summaryCard}>
                     <View style={styles.summaryHeader}>
                         <Text style={styles.summaryTitle}>Today's Summary</Text>
-                        <Text style={styles.summaryDate}>Jan 25, 2026</Text>
+                        <Text style={styles.summaryDate}>
+                            {new Date().toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric'
+                            })}
+                        </Text>
                     </View>
 
                     <View style={styles.summaryStats}>
@@ -167,9 +179,22 @@ const ScanHistoryScreen = ({ navigation }: ScanHistoryScreenProps) => {
                             </View>
                         </View>
                     </View>
+
+                    {/* Guest Banner dalam Summary */}
+                    {isGuest && (
+                        <TouchableOpacity
+                            style={styles.summaryGuestBanner}
+                            onPress={() => setShowLoginModal(true)}
+                        >
+                            <Ionicons name="lock-closed" size={16} color="#082374" />
+                            <Text style={styles.summaryGuestText}>
+                                Login to start tracking your meals
+                            </Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
 
-                {/* Filter Tabs */}
+                {/* Filter Tabs - Disabled untuk guest */}
                 <View style={styles.filterContainer}>
                     <ScrollView
                         horizontal
@@ -181,13 +206,16 @@ const ScanHistoryScreen = ({ navigation }: ScanHistoryScreenProps) => {
                                 key={filter}
                                 style={[
                                     styles.filterButton,
-                                    selectedFilter === filter && styles.filterButtonActive
+                                    selectedFilter === filter && styles.filterButtonActive,
+                                    isGuest && styles.filterButtonDisabled
                                 ]}
-                                onPress={() => setSelectedFilter(filter)}
+                                onPress={() => !isGuest && setSelectedFilter(filter)}
+                                disabled={isGuest}
                             >
                                 <Text style={[
                                     styles.filterText,
-                                    selectedFilter === filter && styles.filterTextActive
+                                    selectedFilter === filter && styles.filterTextActive,
+                                    isGuest && styles.filterTextDisabled
                                 ]}>
                                     {filter}
                                 </Text>
@@ -211,15 +239,34 @@ const ScanHistoryScreen = ({ navigation }: ScanHistoryScreenProps) => {
                             <Ionicons name="restaurant-outline" size={64} color="#ccc" />
                             <Text style={styles.emptyText}>No meals found</Text>
                             <Text style={styles.emptySubtext}>
-                                Start scanning your meals to track your nutrition
+                                {isGuest
+                                    ? 'Login to start tracking your meals'
+                                    : 'Start scanning your meals to track your nutrition'
+                                }
                             </Text>
+                            {isGuest && (
+                                <TouchableOpacity
+                                    style={styles.emptyLoginButton}
+                                    onPress={() => setShowLoginModal(true)}
+                                >
+                                    <Text style={styles.emptyLoginButtonText}>Login Now</Text>
+                                </TouchableOpacity>
+                            )}
                         </View>
                     )}
                 </View>
 
-                {/* Bottom Spacing */}
                 <View style={{ height: 30 }} />
             </ScrollView>
+
+            {/* Login Modal */}
+            <LoginModal
+                visible={showLoginModal}
+                onClose={() => setShowLoginModal(false)}
+                onLoginSuccess={() => {
+                    console.log('Login successful!');
+                }}
+            />
         </SafeAreaView>
     );
 };
@@ -301,7 +348,8 @@ const styles = StyleSheet.create({
         width: 1,
         height: 60,
         backgroundColor: '#e0e0e0',
-        marginHorizontal: 15,
+        marginHorizontal
+            : 15,
     },
     summaryNutrients: {
         flex: 1,
@@ -327,6 +375,21 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: '#333',
     },
+    summaryGuestBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#e0e7ff',
+        padding: 12,
+        borderRadius: 12,
+        marginTop: 16,
+        gap: 8,
+    },
+    summaryGuestText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#082374',
+    },
     filterContainer: {
         paddingVertical: 10,
         backgroundColor: '#ffffff',
@@ -346,6 +409,10 @@ const styles = StyleSheet.create({
     filterButtonActive: {
         backgroundColor: '#082374',
     },
+    filterButtonDisabled: {
+        backgroundColor: '#e0e0e0',
+        opacity: 0.6,
+    },
     filterText: {
         fontSize: 14,
         fontWeight: '600',
@@ -353,6 +420,9 @@ const styles = StyleSheet.create({
     },
     filterTextActive: {
         color: '#ffffff',
+    },
+    filterTextDisabled: {
+        color: '#999',
     },
     historyList: {
         padding: 15,
@@ -453,6 +523,18 @@ const styles = StyleSheet.create({
         marginTop: 8,
         textAlign: 'center',
         paddingHorizontal: 40,
+    },
+    emptyLoginButton: {
+        backgroundColor: '#082374',
+        paddingHorizontal: 30,
+        paddingVertical: 12,
+        borderRadius: 12,
+        marginTop: 20,
+    },
+    emptyLoginButtonText: {
+        color: '#ffffff',
+        fontSize: 15,
+        fontWeight: 'bold',
     },
 });
 export default ScanHistoryScreen;

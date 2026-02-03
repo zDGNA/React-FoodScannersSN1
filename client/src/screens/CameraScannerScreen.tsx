@@ -1,12 +1,11 @@
-import React, { useState, useRef } from "react";
-import { StyleSheet, Text, View, TouchableOpacity, Dimensions, Modal } from "react-native";
+import React, { useState } from "react";
+import { StyleSheet, Text, View, TouchableOpacity, Dimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import LoginModal from '../components/LoginModal';
 
 const { width, height } = Dimensions.get('window');
-
-
 
 type CameraScannerScreenProps = {
     navigation: NativeStackNavigationProp<any>;
@@ -28,9 +27,18 @@ const CameraScannerScreen = ({ navigation }: CameraScannerScreenProps) => {
     const [isScanning, setIsScanning] = useState(false);
     const [detectedFood, setDetectedFood] = useState<DetectedFood | null>(null);
     const [showResult, setShowResult] = useState(false);
+    const [showLoginModal, setShowLoginModal] = useState(false);
+
+    // Guest mode - TODO: Nanti ganti dengan state dari AuthContext
+    const isGuest = true;
 
     // Simulasi AI Detection
     const handleScan = () => {
+        if (isGuest) {
+            setShowLoginModal(true);
+            return;
+        }
+
         setIsScanning(true);
 
         // Simulate AI processing
@@ -51,11 +59,24 @@ const CameraScannerScreen = ({ navigation }: CameraScannerScreenProps) => {
         }, 2000);
     };
 
+    const handleGallery = () => {
+        if (isGuest) {
+            setShowLoginModal(true);
+            return;
+        }
+        // TODO: Implement gallery picker
+        console.log('Open gallery');
+    };
+
     const handleConfirm = () => {
-        // Navigate to detail screen atau simpan data
+        if (isGuest) {
+            setShowLoginModal(true);
+            return;
+        }
+        // Navigate to detail screen
         setShowResult(false);
         setDetectedFood(null);
-        // navigation.navigate('DetailScan', { foodData: detectedFood });
+        navigation.navigate('DetailScanScreen', { foodData: detectedFood });
     };
 
     return (
@@ -65,6 +86,12 @@ const CameraScannerScreen = ({ navigation }: CameraScannerScreenProps) => {
                 <View style={styles.cameraPlaceholder}>
                     <Ionicons name="camera-outline" size={80} color="rgba(255,255,255,0.5)" />
                     <Text style={styles.cameraText}>Camera View</Text>
+                    {isGuest && (
+                        <View style={styles.guestOverlay}>
+                            <Ionicons name="lock-closed" size={40} color="rgba(255,255,255,0.8)" />
+                            <Text style={styles.guestOverlayText}>Login to use camera</Text>
+                        </View>
+                    )}
                 </View>
 
                 {/* Scanning Overlay */}
@@ -82,7 +109,7 @@ const CameraScannerScreen = ({ navigation }: CameraScannerScreenProps) => {
                 )}
 
                 {/* Detection Result (Real-time feedback) */}
-                {showResult && (
+                {showResult && !isGuest && (
                     <View style={styles.resultOverlay}>
                         <View style={styles.detectionBox}>
                             <View style={styles.detectionHeader}>
@@ -107,8 +134,11 @@ const CameraScannerScreen = ({ navigation }: CameraScannerScreenProps) => {
                     <Ionicons name="close" size={28} color="#ffffff" />
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.topButton}>
-                    <Ionicons name="flash-off" size={24} color="#ffffff" />
+                <TouchableOpacity
+                    style={styles.topButton}
+                    disabled={isGuest}
+                >
+                    <Ionicons name="flash-off" size={24} color={isGuest ? "#666" : "#ffffff"} />
                 </TouchableOpacity>
             </View>
 
@@ -116,23 +146,48 @@ const CameraScannerScreen = ({ navigation }: CameraScannerScreenProps) => {
             <View style={styles.bottomControls}>
                 {!showResult ? (
                     <View style={styles.captureControls}>
-                        <TouchableOpacity style={styles.galleryButton}>
-                            <Ionicons name="images-outline" size={24} color="#ffffff" />
+                        <TouchableOpacity
+                            style={[
+                                styles.galleryButton,
+                                isGuest && styles.buttonDisabled
+                            ]}
+                            onPress={handleGallery}
+                        >
+                            <Ionicons
+                                name="images-outline"
+                                size={24}
+                                color={isGuest ? "#666" : "#ffffff"}
+                            />
                         </TouchableOpacity>
 
                         <TouchableOpacity
                             style={[
                                 styles.captureButton,
-                                isScanning && styles.captureButtonActive
+                                isScanning && styles.captureButtonActive,
+                                isGuest && styles.captureButtonGuest
                             ]}
                             onPress={handleScan}
                             disabled={isScanning}
                         >
-                            <View style={styles.captureButtonInner} />
+                            <View style={styles.captureButtonInner}>
+                                {isGuest && (
+                                    <Ionicons name="lock-closed" size={24} color="#666" />
+                                )}
+                            </View>
                         </TouchableOpacity>
 
-                        <TouchableOpacity style={styles.flipButton}>
-                            <Ionicons name="camera-reverse-outline" size={24} color="#ffffff" />
+                        <TouchableOpacity
+                            style={[
+                                styles.flipButton,
+                                isGuest && styles.buttonDisabled
+                            ]}
+                            disabled={isGuest}
+                        >
+                            <Ionicons
+                                name="camera-reverse-outline"
+                                size={24}
+                                color={isGuest ? "#666" : "#ffffff"}
+                            />
                         </TouchableOpacity>
                     </View>
                 ) : (
@@ -141,19 +196,27 @@ const CameraScannerScreen = ({ navigation }: CameraScannerScreenProps) => {
                             <View style={styles.nutrientQuick}>
                                 <View style={styles.nutrientItem}>
                                     <Text style={styles.nutrientLabel}>Calories</Text>
-                                    <Text style={styles.nutrientValue}>{detectedFood ? detectedFood.calories : ''}</Text>
+                                    <Text style={styles.nutrientValue}>
+                                        {detectedFood ? detectedFood.calories : ''}
+                                    </Text>
                                 </View>
                                 <View style={styles.nutrientItem}>
                                     <Text style={styles.nutrientLabel}>Protein</Text>
-                                    <Text style={styles.nutrientValue}>{detectedFood ? `${detectedFood.nutrients.protein}g` : ''}</Text>
+                                    <Text style={styles.nutrientValue}>
+                                        {detectedFood ? `${detectedFood.nutrients.protein}g` : ''}
+                                    </Text>
                                 </View>
                                 <View style={styles.nutrientItem}>
                                     <Text style={styles.nutrientLabel}>Carbs</Text>
-                                    <Text style={styles.nutrientValue}>{detectedFood ? `${detectedFood.nutrients.carbs}g` : ''}</Text>
+                                    <Text style={styles.nutrientValue}>
+                                        {detectedFood ? `${detectedFood.nutrients.carbs}g` : ''}
+                                    </Text>
                                 </View>
                                 <View style={styles.nutrientItem}>
                                     <Text style={styles.nutrientLabel}>Fat</Text>
-                                    <Text style={styles.nutrientValue}>{detectedFood ? `${detectedFood.nutrients.fat}g` : ''}</Text>
+                                    <Text style={styles.nutrientValue}>
+                                        {detectedFood ? `${detectedFood.nutrients.fat}g` : ''}
+                                    </Text>
                                 </View>
                             </View>
                         </View>
@@ -181,13 +244,27 @@ const CameraScannerScreen = ({ navigation }: CameraScannerScreenProps) => {
                     </View>
                 )}
             </View>
+
+            {/* Instructions */}
             {!isScanning && !showResult && (
                 <View style={styles.instructions}>
                     <Text style={styles.instructionText}>
-                        Position food in the center and tap to scan
+                        {isGuest
+                            ? 'Login to scan food and track nutrition'
+                            : 'Position food in the center and tap to scan'
+                        }
                     </Text>
                 </View>
             )}
+
+            {/* Login Modal */}
+            <LoginModal
+                visible={showLoginModal}
+                onClose={() => setShowLoginModal(false)}
+                onLoginSuccess={() => {
+                    console.log('Login successful!');
+                }}
+            />
         </SafeAreaView>
     );
 };
@@ -211,6 +288,16 @@ const styles = StyleSheet.create({
         color: 'rgba(255,255,255,0.5)',
         fontSize: 18,
         marginTop: 20,
+    },
+    guestOverlay: {
+        marginTop: 30,
+        alignItems: 'center',
+    },
+    guestOverlayText: {
+        color: 'rgba(255,255,255,0.8)',
+        fontSize: 16,
+        marginTop: 12,
+        fontWeight: '600',
     },
     scanningOverlay: {
         ...StyleSheet.absoluteFillObject,
@@ -339,6 +426,9 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
+    buttonDisabled: {
+        backgroundColor: 'rgba(100,100,100,0.2)',
+    },
     captureButton: {
         width: 80,
         height: 80,
@@ -352,11 +442,17 @@ const styles = StyleSheet.create({
     captureButtonActive: {
         borderColor: '#4ade80',
     },
+    captureButtonGuest: {
+        backgroundColor: '#e0e0e0',
+        borderColor: '#999',
+    },
     captureButtonInner: {
         width: 60,
         height: 60,
         borderRadius: 30,
         backgroundColor: '#ffffff',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     flipButton: {
         width: 50,
@@ -440,6 +536,8 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         paddingVertical: 10,
         borderRadius: 20,
+        textAlign: 'center',
     },
 });
+
 export default CameraScannerScreen;
