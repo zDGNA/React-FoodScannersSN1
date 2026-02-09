@@ -7,11 +7,15 @@ const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
+const FormData = require('form-data');
+const axios = require('axios');
+const fs = require('fs');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this';
+const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:5000';
 
 // Middleware
 app.use(cors());
@@ -29,6 +33,11 @@ const pool = mysql.createPool({
   connectionLimit: 10,
   queueLimit: 0,
 });
+
+// Create uploads directory if not exists
+if (!fs.existsSync('uploads')) {
+  fs.mkdirSync('uploads');
+}
 
 // File upload configuration
 const storage = multer.diskStorage({
@@ -91,7 +100,6 @@ app.post('/api/auth/register', async (req, res) => {
   try {
     const { username, email, password, full_name } = req.body;
 
-    // Validation
     if (!username || !email || !password) {
       return res
         .status(400)
@@ -238,7 +246,6 @@ app.get('/api/user/goals', authenticateToken, async (req, res) => {
     );
 
     if (goals.length === 0) {
-      // Create default goals if not exists
       await pool.query('INSERT INTO user_goals (user_id) VALUES (?)', [
         req.user.id,
       ]);
@@ -344,6 +351,179 @@ app.get('/api/foods/:id', async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
+
+// ==================== AI DETECTION ROUTES ====================
+
+// AI Food Detection
+app.post('/api/ai/detect', upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res
+        .status(400)
+        .json({ success: false, message: 'No image provided' });
+    }
+
+    const imagePath = req.file.path;
+
+    // Create form data to send to AI service
+    const formData = new FormData();
+    formData.append('image', fs.createReadStream(imagePath));
+
+    // Call AI service
+    const aiResponse = await axios.post(`${AI_SERVICE_URL}/detect`, formData, {
+      headers: {
+        ...formData.getHeaders(),
+      },
+      timeout: 30000, // 30 seconds timeout
+    });
+
+    if (!aiResponse.data.success) {
+      return res.json({
+        success: false,
+        message: 'No food detected in image',
+        image_url: `/uploads/${req.file.filename}`,
+      });
+    }
+
+    const detection = aiResponse.data.detection;
+
+    // Try to find food in database
+    const [dbFoods] = await pool.query(
+      'SELECT * FROM foods WHERE LOWER(name) LIKE ?',
+      [`%${detection.food_name.toLowerCase()}%`],
+    );
+
+    let foodData;
+    if (dbFoods.length > 0) {
+      // Use data from database
+      foodData = dbFoods[0];
+    } else {
+      // Use data from AI detection
+      foodData = {
+        name: detection.food_name,
+        calories: detection.nutrition.calories,
+        protein: detection.nutrition.protein,
+        carbs: detection.nutrition.carbs,
+        fat: detection.nutrition.fat,
+        portion: detection.portion,
+      };
+    }
+
+    // Return detection result
+    res.json({
+      success: true,
+      detection: {
+        food_name: detection.food_name,
+        confidence: detection.confidence,
+        nutrition: {
+          calories: foodData.calories,
+          protein: foodData.protein,
+          carbs: foodData.carbs,
+          fat: foodData.fat,
+        },
+        portion: detection.portion,
+        image_url: `/uploads/${req.file.filename}`,
+        food_id: dbFoods.length > 0 ? dbFoods[0].id : null,
+      },
+    });
+  } catch (error) {
+    console.error('AI detection error:', error);
+
+    // Return friendly error message
+    if (error.code === 'ECONNREFUSED') {
+      return res.status(503).json({
+        success: false,
+        message: 'AI service is currently unavailable',
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Error processing image',
+      error: error.message,
+    });
+  }
+});
+
+// AI Multiple Food Detection
+app.post(
+  '/api/ai/detect-multiple',
+  upload.single('image'),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res
+          .status(400)
+          .json({ success: false, message: 'No image provided' });
+      }
+
+      const imagePath = req.file.path;
+
+      const formData = new FormData();
+      formData.append('image', fs.createReadStream(imagePath));
+
+      const aiResponse = await axios.post(
+        `${AI_SERVICE_URL}/detect-multiple`,
+        formData,
+        {
+          headers: {
+            ...formData.getHeaders(),
+          },
+          timeout: 30000,
+        },
+      );
+
+      const detections = aiResponse.data.detections || [];
+
+      // Enrich detections with database info
+      const enrichedDetections = await Promise.all(
+        detections.map(async detection => {
+          const [dbFoods] = await pool.query(
+            'SELECT * FROM foods WHERE LOWER(name) LIKE ?',
+            [`%${detection.food_name.toLowerCase()}%`],
+          );
+
+          if (dbFoods.length > 0) {
+            return {
+              ...detection,
+              food_id: dbFoods[0].id,
+              nutrition: {
+                calories: dbFoods[0].calories,
+                protein: dbFoods[0].protein,
+                carbs: dbFoods[0].carbs,
+                fat: dbFoods[0].fat,
+              },
+            };
+          }
+
+          return detection;
+        }),
+      );
+
+      res.json({
+        success: true,
+        count: enrichedDetections.length,
+        detections: enrichedDetections,
+        image_url: `/uploads/${req.file.filename}`,
+      });
+    } catch (error) {
+      console.error('AI multiple detection error:', error);
+
+      if (error.code === 'ECONNREFUSED') {
+        return res.status(503).json({
+          success: false,
+          message: 'AI service is currently unavailable',
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        message: 'Error processing image',
+        error: error.message,
+      });
+    }
+  },
+);
 
 // ==================== SCAN HISTORY ROUTES ====================
 
@@ -500,7 +680,6 @@ app.get('/api/summary/daily', authenticateToken, async (req, res) => {
 // Delete scan
 app.delete('/api/scans/:id', authenticateToken, async (req, res) => {
   try {
-    // Get scan details first
     const [scans] = await pool.query(
       'SELECT * FROM scan_history WHERE id = ? AND user_id = ?',
       [req.params.id, req.user.id],
@@ -514,10 +693,8 @@ app.delete('/api/scans/:id', authenticateToken, async (req, res) => {
 
     const scan = scans[0];
 
-    // Delete scan
     await pool.query('DELETE FROM scan_history WHERE id = ?', [req.params.id]);
 
-    // Update daily summary
     await pool.query(
       `UPDATE daily_summary SET
             total_calories = total_calories - ?,
@@ -545,51 +722,40 @@ app.delete('/api/scans/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// ==================== AI SIMULATION ROUTE ====================
+// ==================== HEALTH CHECK ====================
 
-// Simulate AI food detection
-app.post('/api/ai/detect', upload.single('image'), async (req, res) => {
+app.get('/api/health', async (req, res) => {
   try {
-    // In production, this would call your AI model
-    // For now, we'll simulate a response
+    // Check database connection
+    await pool.query('SELECT 1');
 
-    const mockFoods = [
-      { name: 'Grilled Chicken Breast', confidence: 95, food_id: 1 },
-      { name: 'White Rice', confidence: 92, food_id: 2 },
-      { name: 'Broccoli', confidence: 88, food_id: 3 },
-      { name: 'Salmon', confidence: 93, food_id: 4 },
-      { name: 'Banana', confidence: 90, food_id: 5 },
-    ];
-
-    const randomFood = mockFoods[Math.floor(Math.random() * mockFoods.length)];
-
-    // Get full food details
-    const [foods] = await pool.query('SELECT * FROM foods WHERE id = ?', [
-      randomFood.food_id,
-    ]);
+    // Check AI service
+    let aiServiceStatus = 'unknown';
+    try {
+      const aiHealth = await axios.get(`${AI_SERVICE_URL}/health`, {
+        timeout: 5000,
+      });
+      aiServiceStatus = aiHealth.data.status;
+    } catch (error) {
+      aiServiceStatus = 'unavailable';
+    }
 
     res.json({
       success: true,
-      detection: {
-        ...randomFood,
-        food_details: foods[0],
-        image_url: req.file ? `/uploads/${req.file.filename}` : null,
+      message: 'Server is running',
+      timestamp: new Date(),
+      services: {
+        database: 'connected',
+        ai_service: aiServiceStatus,
       },
     });
   } catch (error) {
-    console.error('AI detection error:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
+    res.status(500).json({
+      success: false,
+      message: 'Health check failed',
+      error: error.message,
+    });
   }
-});
-
-// ==================== HEALTH CHECK ====================
-
-app.get('/api/health', (req, res) => {
-  res.json({
-    success: true,
-    message: 'Server is running',
-    timestamp: new Date(),
-  });
 });
 
 // ==================== START SERVER ====================
@@ -597,6 +763,7 @@ app.get('/api/health', (req, res) => {
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
+  console.log(`🤖 AI Service URL: ${AI_SERVICE_URL}`);
 });
 
 // Handle uncaught errors

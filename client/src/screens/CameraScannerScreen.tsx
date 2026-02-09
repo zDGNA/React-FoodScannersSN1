@@ -1,11 +1,20 @@
-import React, { useState } from "react";
-import { StyleSheet, Text, View, TouchableOpacity, Dimensions } from "react-native";
+// client/src/screens/CameraScannerScreen.tsx
+
+import React, { useState, useEffect, useRef } from "react";
+import { StyleSheet, Text, View, TouchableOpacity, Dimensions, Alert, Platform, Linking, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Camera, useCameraDevice, useCameraPermission, useCodeScanner } from 'react-native-vision-camera';
+import { launchImageLibrary } from 'react-native-image-picker';
 import LoginModal from '../components/LoginModal';
+import axios from 'axios';
+import FormData from 'form-data';
 
 const { width, height } = Dimensions.get('window');
+
+// API Base URL - Sesuaikan dengan setup Anda
+const API_BASE_URL = 'http://10.0.2.2:3000/api';
 
 type CameraScannerScreenProps = {
     navigation: NativeStackNavigationProp<any>;
@@ -21,6 +30,7 @@ type DetectedFood = {
         carbs: number;
         fat: number;
     };
+    food_id?: number;
 };
 
 const CameraScannerScreen = ({ navigation }: CameraScannerScreenProps) => {
@@ -28,44 +38,178 @@ const CameraScannerScreen = ({ navigation }: CameraScannerScreenProps) => {
     const [detectedFood, setDetectedFood] = useState<DetectedFood | null>(null);
     const [showResult, setShowResult] = useState(false);
     const [showLoginModal, setShowLoginModal] = useState(false);
+    const [capturedImage, setCapturedImage] = useState<string | null>(null);
+    const [flashMode, setFlashMode] = useState<'off' | 'on'>('off');
 
     // Guest mode - TODO: Nanti ganti dengan state dari AuthContext
     const isGuest = true;
 
-    // Simulasi AI Detection
-    const handleScan = () => {
-        if (isGuest) {
-            setShowLoginModal(true);
-            return;
+    // Camera hooks
+    const { hasPermission, requestPermission } = useCameraPermission();
+    const device = useCameraDevice('back');
+    const camera = useRef<Camera>(null);
+
+
+    // Request camera permission on mount
+    useEffect(() => {
+        checkCameraPermission();
+    }, []);
+
+    const checkCameraPermission = async () => {
+        if (!hasPermission) {
+            const permission = await requestPermission();
+            if (!permission) {
+                Alert.alert(
+                    'Camera Permission Required',
+                    'Please enable camera access in your device settings to use this feature.',
+                    [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Open Settings', onPress: () => Linking.openSettings() }
+                    ]
+                );
+            }
         }
-
-        setIsScanning(true);
-
-        // Simulate AI processing
-        setTimeout(() => {
-            setDetectedFood({
-                name: 'Grilled Chicken Breast',
-                calories: 165,
-                portion: '100g',
-                confidence: 95,
-                nutrients: {
-                    protein: 31,
-                    carbs: 0,
-                    fat: 3.6,
-                }
-            });
-            setIsScanning(false);
-            setShowResult(true);
-        }, 2000);
     };
 
-    const handleGallery = () => {
+    const handleTakePhoto = async () => {
         if (isGuest) {
             setShowLoginModal(true);
             return;
         }
-        // TODO: Implement gallery picker
-        console.log('Open gallery');
+
+        if (!camera.current) {
+            Alert.alert('Error', 'Camera not ready');
+            return;
+        }
+
+        try {
+            setIsScanning(true);
+
+            // Take photo
+            const photo = await camera.current.takePhoto({
+                flash: flashMode,
+            });
+
+            console.log('Photo taken:', photo.path);
+            setCapturedImage(`file://${photo.path}`);
+
+            // Send to AI for detection
+            await detectFood(`file://${photo.path}`);
+
+        } catch (error) {
+            console.error('Take photo error:', error);
+            Alert.alert('Error', 'Failed to take photo. Please try again.');
+            setIsScanning(false);
+        }
+    };
+
+    const handleGallery = async () => {
+        if (isGuest) {
+            setShowLoginModal(true);
+            return;
+        }
+
+        try {
+            const result = await launchImageLibrary({
+                mediaType: 'photo',
+                quality: 1,
+            });
+
+            if (result.didCancel) {
+                return;
+            }
+
+            if (result.assets && result.assets[0]) {
+                const asset = result.assets[0];
+                console.log('Image selected:', asset.uri);
+
+                setIsScanning(true);
+                setCapturedImage(asset.uri || null);
+
+                // Send to AI for detection
+                await detectFood(asset.uri || '');
+            }
+        } catch (error) {
+            console.error('Gallery picker error:', error);
+            Alert.alert('Error', 'Failed to select image from gallery.');
+        }
+    };
+
+    const detectFood = async (imageUri: string) => {
+        try {
+            // Create form data
+            const formData = new FormData();
+
+            // Prepare image file
+            const filename = imageUri.split('/').pop() || 'photo.jpg';
+            const match = /\.(\w+)$/.exec(filename);
+            const type = match ? `image/${match[1]}` : 'image/jpeg';
+
+            formData.append('image', {
+                uri: imageUri,
+                type: type,
+                name: filename,
+            } as any);
+
+            // Send to backend API
+            const response = await axios.post(`${API_BASE_URL}/ai/detect`, formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+                timeout: 30000, // 30 seconds
+            });
+
+            console.log('AI Detection Response:', response.data);
+
+            if (response.data.success) {
+                const detection = response.data.detection;
+
+                setDetectedFood({
+                    name: detection.food_name,
+                    calories: detection.nutrition.calories,
+                    portion: detection.portion,
+                    confidence: detection.confidence,
+                    nutrients: {
+                        protein: detection.nutrition.protein,
+                        carbs: detection.nutrition.carbs,
+                        fat: detection.nutrition.fat,
+                    },
+                    food_id: detection.food_id,
+                });
+
+                setShowResult(true);
+            } else {
+                Alert.alert(
+                    'No Food Detected',
+                    'Could not identify any food in the image. Please try again with a clearer photo.',
+                    [{ text: 'OK', onPress: () => handleRetake() }]
+                );
+            }
+        } catch (error: any) {
+            console.error('Food detection error:', error);
+
+            let errorMessage = 'Failed to analyze image. ';
+
+            if (error.code === 'ECONNABORTED') {
+                errorMessage += 'Request timed out. Please try again.';
+            } else if (error.response?.status === 503) {
+                errorMessage += 'AI service is currently unavailable.';
+            } else {
+                errorMessage += 'Please check your connection and try again.';
+            }
+
+            Alert.alert('Detection Failed', errorMessage, [
+                { text: 'OK', onPress: () => handleRetake() }
+            ]);
+        } finally {
+            setIsScanning(false);
+        }
+    };
+
+    const handleRetake = () => {
+        setShowResult(false);
+        setDetectedFood(null);
+        setCapturedImage(null);
     };
 
     const handleConfirm = () => {
@@ -73,57 +217,113 @@ const CameraScannerScreen = ({ navigation }: CameraScannerScreenProps) => {
             setShowLoginModal(true);
             return;
         }
-        // Navigate to detail screen
-        setShowResult(false);
-        setDetectedFood(null);
-        navigation.navigate('DetailScanScreen', { foodData: detectedFood });
+
+        // Navigate to detail screen with food data
+        navigation.navigate('DetailScanScreen', {
+            foodData: detectedFood,
+            imageUri: capturedImage
+        });
+
+        // Reset state
+        handleRetake();
     };
+
+    const toggleFlash = () => {
+        setFlashMode(flashMode === 'off' ? 'on' : 'off');
+    };
+
+    // If no permission, show permission screen
+    if (!hasPermission) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <View style={styles.permissionContainer}>
+                    <Ionicons name="camera-outline" size={80} color="#666" />
+                    <Text style={styles.permissionTitle}>Camera Permission Required</Text>
+                    <Text style={styles.permissionText}>
+                        We need access to your camera to scan and identify food items.
+                    </Text>
+                    <TouchableOpacity
+                        style={styles.permissionButton}
+                        onPress={checkCameraPermission}
+                    >
+                        <Text style={styles.permissionButtonText}>Grant Permission</Text>
+                    </TouchableOpacity>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    // If no device, show error
+    if (!device) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <View style={styles.permissionContainer}>
+                    <Ionicons name="camera-outline" size={80} color="#666" />
+                    <Text style={styles.permissionTitle}>Camera Not Available</Text>
+                    <Text style={styles.permissionText}>
+                        No camera device found on this device.
+                    </Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
 
     return (
         <SafeAreaView style={styles.container}>
-            {/* Camera View Placeholder */}
-            <View style={styles.cameraView}>
-                <View style={styles.cameraPlaceholder}>
-                    <Ionicons name="camera-outline" size={80} color="rgba(255,255,255,0.5)" />
-                    <Text style={styles.cameraText}>Camera View</Text>
-                    {isGuest && (
-                        <View style={styles.guestOverlay}>
-                            <Ionicons name="lock-closed" size={40} color="rgba(255,255,255,0.8)" />
-                            <Text style={styles.guestOverlayText}>Login to use camera</Text>
-                        </View>
-                    )}
+            {/* Camera View or Captured Image */}
+            {!capturedImage ? (
+                <Camera
+                    ref={camera}
+                    style={StyleSheet.absoluteFill}
+                    device={device}
+                    isActive={!showResult && !isGuest}
+                    photo={true}
+                    videoStabilizationMode="auto" // Opsi: "off", "standard", "cinematic", "cinematic-extended"
+                />
+            ) : (
+                <Image
+                    source={{ uri: capturedImage }}
+                    style={StyleSheet.absoluteFill}
+                    resizeMode="cover"
+                />
+            )}
+
+            {/* Guest Overlay */}
+            {isGuest && !capturedImage && (
+                <View style={styles.guestOverlay}>
+                    <Ionicons name="lock-closed" size={60} color="rgba(255,255,255,0.8)" />
+                    <Text style={styles.guestOverlayText}>Login to use camera</Text>
                 </View>
+            )}
 
-                {/* Scanning Overlay */}
-                {isScanning && (
-                    <View style={styles.scanningOverlay}>
-                        <View style={styles.scanBox}>
-                            <View style={[styles.corner, styles.cornerTopLeft]} />
-                            <View style={[styles.corner, styles.cornerTopRight]} />
-                            <View style={[styles.corner, styles.cornerBottomLeft]} />
-                            <View style={[styles.corner, styles.cornerBottomRight]} />
-                            <View style={styles.scanLine} />
-                        </View>
-                        <Text style={styles.scanningText}>Analyzing food...</Text>
+            {/* Scanning Overlay */}
+            {isScanning && (
+                <View style={styles.scanningOverlay}>
+                    <View style={styles.scanBox}>
+                        <View style={[styles.corner, styles.cornerTopLeft]} />
+                        <View style={[styles.corner, styles.cornerTopRight]} />
+                        <View style={[styles.corner, styles.cornerBottomLeft]} />
+                        <View style={[styles.corner, styles.cornerBottomRight]} />
                     </View>
-                )}
+                    <Text style={styles.scanningText}>Analyzing food...</Text>
+                </View>
+            )}
 
-                {/* Detection Result (Real-time feedback) */}
-                {showResult && !isGuest && (
-                    <View style={styles.resultOverlay}>
-                        <View style={styles.detectionBox}>
-                            <View style={styles.detectionHeader}>
-                                <View style={styles.confidenceBadge}>
-                                    <Text style={styles.confidenceText}>
-                                        {detectedFood ? `${detectedFood.confidence}% Match` : ''}
-                                    </Text>
-                                </View>
+            {/* Detection Result Overlay */}
+            {showResult && detectedFood && (
+                <View style={styles.resultOverlay}>
+                    <View style={styles.detectionBox}>
+                        <View style={styles.detectionHeader}>
+                            <View style={styles.confidenceBadge}>
+                                <Text style={styles.confidenceText}>
+                                    {detectedFood.confidence}% Match
+                                </Text>
                             </View>
-                            <Text style={styles.foodName}>{detectedFood ? detectedFood.name : ''}</Text>
                         </View>
+                        <Text style={styles.foodName}>{detectedFood.name}</Text>
                     </View>
-                )}
-            </View>
+                </View>
+            )}
 
             {/* Top Controls */}
             <View style={styles.topControls}>
@@ -136,9 +336,14 @@ const CameraScannerScreen = ({ navigation }: CameraScannerScreenProps) => {
 
                 <TouchableOpacity
                     style={styles.topButton}
+                    onPress={toggleFlash}
                     disabled={isGuest}
                 >
-                    <Ionicons name="flash-off" size={24} color={isGuest ? "#666" : "#ffffff"} />
+                    <Ionicons
+                        name={flashMode === 'on' ? "flash" : "flash-off"}
+                        size={24}
+                        color={isGuest ? "#666" : "#ffffff"}
+                    />
                 </TouchableOpacity>
             </View>
 
@@ -163,11 +368,11 @@ const CameraScannerScreen = ({ navigation }: CameraScannerScreenProps) => {
                         <TouchableOpacity
                             style={[
                                 styles.captureButton,
-                                isScanning && styles.captureButtonActive,
-                                isGuest && styles.captureButtonGuest
+                                isGuest && styles.captureButtonGuest,
+                                isScanning && styles.captureButtonActive
                             ]}
-                            onPress={handleScan}
-                            disabled={isScanning}
+                            onPress={handleTakePhoto}
+                            disabled={isScanning || isGuest}
                         >
                             <View style={styles.captureButtonInner}>
                                 {isGuest && (
@@ -176,19 +381,7 @@ const CameraScannerScreen = ({ navigation }: CameraScannerScreenProps) => {
                             </View>
                         </TouchableOpacity>
 
-                        <TouchableOpacity
-                            style={[
-                                styles.flipButton,
-                                isGuest && styles.buttonDisabled
-                            ]}
-                            disabled={isGuest}
-                        >
-                            <Ionicons
-                                name="camera-reverse-outline"
-                                size={24}
-                                color={isGuest ? "#666" : "#ffffff"}
-                            />
-                        </TouchableOpacity>
+                        <View style={styles.galleryButton} />
                     </View>
                 ) : (
                     <View style={styles.resultPanel}>
@@ -197,25 +390,25 @@ const CameraScannerScreen = ({ navigation }: CameraScannerScreenProps) => {
                                 <View style={styles.nutrientItem}>
                                     <Text style={styles.nutrientLabel}>Calories</Text>
                                     <Text style={styles.nutrientValue}>
-                                        {detectedFood ? detectedFood.calories : ''}
+                                        {detectedFood?.calories}
                                     </Text>
                                 </View>
                                 <View style={styles.nutrientItem}>
                                     <Text style={styles.nutrientLabel}>Protein</Text>
                                     <Text style={styles.nutrientValue}>
-                                        {detectedFood ? `${detectedFood.nutrients.protein}g` : ''}
+                                        {detectedFood?.nutrients.protein}g
                                     </Text>
                                 </View>
                                 <View style={styles.nutrientItem}>
                                     <Text style={styles.nutrientLabel}>Carbs</Text>
                                     <Text style={styles.nutrientValue}>
-                                        {detectedFood ? `${detectedFood.nutrients.carbs}g` : ''}
+                                        {detectedFood?.nutrients.carbs}g
                                     </Text>
                                 </View>
                                 <View style={styles.nutrientItem}>
                                     <Text style={styles.nutrientLabel}>Fat</Text>
                                     <Text style={styles.nutrientValue}>
-                                        {detectedFood ? `${detectedFood.nutrients.fat}g` : ''}
+                                        {detectedFood?.nutrients.fat}g
                                     </Text>
                                 </View>
                             </View>
@@ -224,10 +417,7 @@ const CameraScannerScreen = ({ navigation }: CameraScannerScreenProps) => {
                         <View style={styles.resultActions}>
                             <TouchableOpacity
                                 style={styles.retakeButton}
-                                onPress={() => {
-                                    setShowResult(false);
-                                    setDetectedFood(null);
-                                }}
+                                onPress={handleRetake}
                             >
                                 <Ionicons name="refresh" size={20} color="#666" />
                                 <Text style={styles.retakeText}>Retake</Text>
@@ -246,7 +436,7 @@ const CameraScannerScreen = ({ navigation }: CameraScannerScreenProps) => {
             </View>
 
             {/* Instructions */}
-            {!isScanning && !showResult && (
+            {!isScanning && !showResult && !capturedImage && (
                 <View style={styles.instructions}>
                     <Text style={styles.instructionText}>
                         {isGuest
@@ -274,29 +464,47 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#000000',
     },
-    cameraView: {
+    permissionContainer: {
         flex: 1,
-        backgroundColor: '#1a1a1a',
         justifyContent: 'center',
         alignItems: 'center',
+        padding: 40,
     },
-    cameraPlaceholder: {
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    cameraText: {
-        color: 'rgba(255,255,255,0.5)',
-        fontSize: 18,
+    permissionTitle: {
+        fontSize: 22,
+        fontWeight: 'bold',
+        color: '#333',
         marginTop: 20,
+        marginBottom: 10,
+    },
+    permissionText: {
+        fontSize: 16,
+        color: '#666',
+        textAlign: 'center',
+        marginBottom: 30,
+        lineHeight: 24,
+    },
+    permissionButton: {
+        backgroundColor: '#082374',
+        paddingHorizontal: 30,
+        paddingVertical: 14,
+        borderRadius: 12,
+    },
+    permissionButtonText: {
+        color: '#ffffff',
+        fontSize: 16,
+        fontWeight: 'bold',
     },
     guestOverlay: {
-        marginTop: 30,
+        ...StyleSheet.absoluteFillObject,
+        justifyContent: 'center',
         alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.7)',
     },
     guestOverlayText: {
-        color: 'rgba(255,255,255,0.8)',
-        fontSize: 16,
-        marginTop: 12,
+        color: 'rgba(255,255,255,0.9)',
+        fontSize: 18,
+        marginTop: 16,
         fontWeight: '600',
     },
     scanningOverlay: {
@@ -341,16 +549,9 @@ const styles = StyleSheet.create({
         borderLeftWidth: 0,
         borderTopWidth: 0,
     },
-    scanLine: {
-        width: '100%',
-        height: 2,
-        backgroundColor: '#4ade80',
-        position: 'absolute',
-        top: '50%',
-    },
     scanningText: {
         color: '#ffffff',
-        fontSize: 16,
+        fontSize: 18,
         marginTop: 40,
         fontWeight: '600',
     },
@@ -451,14 +652,6 @@ const styles = StyleSheet.create({
         height: 60,
         borderRadius: 30,
         backgroundColor: '#ffffff',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    flipButton: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        backgroundColor: 'rgba(255,255,255,0.2)',
         justifyContent: 'center',
         alignItems: 'center',
     },

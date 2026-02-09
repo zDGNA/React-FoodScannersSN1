@@ -1,0 +1,7 @@
+D:\ReactNativeProject\MyFirstApp\android\app\.cxx\Debug\6b2co551\x86_64\VectorIconsIonicons_autolinked_build\CMakeFiles\react_codegen_VectorIconsIonicons.dir\VectorIconsIonicons-generated.cpp.o
+D:\ReactNativeProject\MyFirstApp\android\app\.cxx\Debug\6b2co551\x86_64\VectorIconsIonicons_autolinked_build\CMakeFiles\react_codegen_VectorIconsIonicons.dir\react\renderer\components\VectorIconsIonicons\ComponentDescriptors.cpp.o
+D:\ReactNativeProject\MyFirstApp\android\app\.cxx\Debug\6b2co551\x86_64\VectorIconsIonicons_autolinked_build\CMakeFiles\react_codegen_VectorIconsIonicons.dir\react\renderer\components\VectorIconsIonicons\EventEmitters.cpp.o
+D:\ReactNativeProject\MyFirstApp\android\app\.cxx\Debug\6b2co551\x86_64\VectorIconsIonicons_autolinked_build\CMakeFiles\react_codegen_VectorIconsIonicons.dir\react\renderer\components\VectorIconsIonicons\Props.cpp.o
+D:\ReactNativeProject\MyFirstApp\android\app\.cxx\Debug\6b2co551\x86_64\VectorIconsIonicons_autolinked_build\CMakeFiles\react_codegen_VectorIconsIonicons.dir\react\renderer\components\VectorIconsIonicons\ShadowNodes.cpp.o
+D:\ReactNativeProject\MyFirstApp\android\app\.cxx\Debug\6b2co551\x86_64\VectorIconsIonicons_autolinked_build\CMakeFiles\react_codegen_VectorIconsIonicons.dir\react\renderer\components\VectorIconsIonicons\States.cpp.o
+D:\ReactNativeProject\MyFirstApp\android\app\.cxx\Debug\6b2co551\x86_64\VectorIconsIonicons_autolinked_build\CMakeFiles\react_codegen_VectorIconsIonicons.dir\react\renderer\components\VectorIconsIonicons\VectorIconsIoniconsJSI-generated.cpp.o

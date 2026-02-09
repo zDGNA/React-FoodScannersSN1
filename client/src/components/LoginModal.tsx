@@ -1,11 +1,30 @@
+// client/src/components/LoginModal.tsx
+
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, TextInput, Alert, ActivityIndicator } from 'react-native';
 import Ionicons from '@react-native-vector-icons/ionicons';
+import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Storage utility with fallback
+const setStorageItem = async (key: string, value: string) => {
+    try {
+        await AsyncStorage.setItem(key, value);
+    } catch (error) {
+        console.error(`Failed to save ${key}:`, error);
+    }
+};
+
+// API Base URL - Sesuaikan dengan IP komputer Anda
+// Untuk Android Emulator: http://10.0.2.2:3000
+// Untuk iOS Simulator: http://localhost:3000
+// Untuk Physical Device: http://YOUR_COMPUTER_IP:3000 (contoh: http://192.168.1.100:3000)
+const API_BASE_URL = 'http://192.168.1.66:3000/api'; // Ganti sesuai kebutuhan
 
 interface LoginModalProps {
     visible: boolean;
     onClose: () => void;
-    onLoginSuccess?: () => void;
+    onLoginSuccess?: (userData: any) => void;
 }
 
 const LoginModal = ({ visible, onClose, onLoginSuccess }: LoginModalProps) => {
@@ -13,29 +32,151 @@ const LoginModal = ({ visible, onClose, onLoginSuccess }: LoginModalProps) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [fullName, setFullName] = useState('');
+    const [username, setUsername] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+
+    const validateEmail = (email: string) => {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(email);
+    };
+
+    const handleRegister = async () => {
+        // Validation
+        if (!fullName.trim()) {
+            Alert.alert('Error', 'Please enter your full name');
+            return;
+        }
+        if (!username.trim()) {
+            Alert.alert('Error', 'Please enter a username');
+            return;
+        }
+        if (!email.trim()) {
+            Alert.alert('Error', 'Please enter your email');
+            return;
+        }
+        if (!validateEmail(email)) {
+            Alert.alert('Error', 'Please enter a valid email address');
+            return;
+        }
+        if (password.length < 6) {
+            Alert.alert('Error', 'Password must be at least 6 characters');
+            return;
+        }
+
+        setIsLoading(true);
+        try {
+            const response = await axios.post(`${API_BASE_URL}/auth/register`, {
+                username: username.trim(),
+                email: email.trim().toLowerCase(),
+                password: password,
+                full_name: fullName.trim(),
+            });
+
+            if (response.data.success) {
+                // Save token
+                await AsyncStorage.setItem('authToken', response.data.token);
+                await AsyncStorage.setItem('userData', JSON.stringify(response.data.user));
+
+                Alert.alert('Success', 'Account created successfully!', [
+                    {
+                        text: 'OK',
+                        onPress: () => {
+                            resetForm();
+                            if (onLoginSuccess) {
+                                onLoginSuccess(response.data.user);
+                            }
+                            onClose();
+                        },
+                    },
+                ]);
+            }
+        } catch (error: any) {
+            console.error('Register error:', error.response?.data || error.message);
+            const errorMessage = error.response?.data?.message || 'Registration failed. Please try again.';
+            Alert.alert('Registration Failed', errorMessage);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleLogin = async () => {
+        // Validation
+        if (!email.trim()) {
+            Alert.alert('Error', 'Please enter your email');
+            return;
+        }
+        if (!validateEmail(email)) {
+            Alert.alert('Error', 'Please enter a valid email address');
+            return;
+        }
+        if (!password) {
+            Alert.alert('Error', 'Please enter your password');
+            return;
+        }
+
+        setIsLoading(true);
+        try {
+            const response = await axios.post(`${API_BASE_URL}/auth/login`, {
+                email: email.trim().toLowerCase(),
+                password: password,
+            });
+
+            if (response.data.success) {
+                // Save token
+                await AsyncStorage.setItem('authToken', response.data.token);
+                await AsyncStorage.setItem('userData', JSON.stringify(response.data.user));
+
+                Alert.alert('Success', 'Welcome back!', [
+                    {
+                        text: 'OK',
+                        onPress: () => {
+                            resetForm();
+                            if (onLoginSuccess) {
+                                onLoginSuccess(response.data.user);
+                            }
+                            onClose();
+                        },
+                    },
+                ]);
+            }
+        } catch (error: any) {
+            console.error('Login error:', error.response?.data || error.message);
+            const errorMessage = error.response?.data?.message || 'Login failed. Please check your credentials.';
+            Alert.alert('Login Failed', errorMessage);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     const handleSubmit = () => {
-        // TODO: Implement actual login/register logic here
-        console.log('Login/Register:', { email, password, fullName });
-
-        // For now, just close modal
-        // In future, call API and handle response
-        if (onLoginSuccess) {
-            onLoginSuccess();
+        if (isLogin) {
+            handleLogin();
+        } else {
+            handleRegister();
         }
-        onClose();
     };
 
     const resetForm = () => {
         setEmail('');
         setPassword('');
         setFullName('');
+        setUsername('');
         setIsLogin(true);
+        setShowPassword(false);
     };
 
     const handleClose = () => {
         resetForm();
         onClose();
+    };
+
+    const switchMode = () => {
+        setIsLogin(!isLogin);
+        setEmail('');
+        setPassword('');
+        setFullName('');
+        setUsername('');
     };
 
     return (
@@ -50,6 +191,7 @@ const LoginModal = ({ visible, onClose, onLoginSuccess }: LoginModalProps) => {
                     <TouchableOpacity
                         style={styles.closeButton}
                         onPress={handleClose}
+                        disabled={isLoading}
                     >
                         <Ionicons name="close" size={28} color="#333" />
                     </TouchableOpacity>
@@ -68,19 +210,38 @@ const LoginModal = ({ visible, onClose, onLoginSuccess }: LoginModalProps) => {
 
                     <View style={styles.modalBody}>
                         {!isLogin && (
-                            <View style={styles.inputGroup}>
-                                <Text style={styles.inputLabel}>Full Name</Text>
-                                <View style={styles.inputContainer}>
-                                    <Ionicons name="person-outline" size={20} color="#666" />
-                                    <TextInput
-                                        style={styles.input}
-                                        placeholder="Enter your name"
-                                        placeholderTextColor="#999"
-                                        value={fullName}
-                                        onChangeText={setFullName}
-                                    />
+                            <>
+                                <View style={styles.inputGroup}>
+                                    <Text style={styles.inputLabel}>Full Name</Text>
+                                    <View style={styles.inputContainer}>
+                                        <Ionicons name="person-outline" size={20} color="#666" />
+                                        <TextInput
+                                            style={styles.input}
+                                            placeholder="Enter your name"
+                                            placeholderTextColor="#999"
+                                            value={fullName}
+                                            onChangeText={setFullName}
+                                            editable={!isLoading}
+                                        />
+                                    </View>
                                 </View>
-                            </View>
+
+                                <View style={styles.inputGroup}>
+                                    <Text style={styles.inputLabel}>Username</Text>
+                                    <View style={styles.inputContainer}>
+                                        <Ionicons name="at-outline" size={20} color="#666" />
+                                        <TextInput
+                                            style={styles.input}
+                                            placeholder="Choose a username"
+                                            placeholderTextColor="#999"
+                                            value={username}
+                                            onChangeText={setUsername}
+                                            autoCapitalize="none"
+                                            editable={!isLoading}
+                                        />
+                                    </View>
+                                </View>
+                            </>
                         )}
 
                         <View style={styles.inputGroup}>
@@ -95,6 +256,7 @@ const LoginModal = ({ visible, onClose, onLoginSuccess }: LoginModalProps) => {
                                     onChangeText={setEmail}
                                     keyboardType="email-address"
                                     autoCapitalize="none"
+                                    editable={!isLoading}
                                 />
                             </View>
                         </View>
@@ -109,8 +271,16 @@ const LoginModal = ({ visible, onClose, onLoginSuccess }: LoginModalProps) => {
                                     placeholderTextColor="#999"
                                     value={password}
                                     onChangeText={setPassword}
-                                    secureTextEntry
+                                    secureTextEntry={!showPassword}
+                                    editable={!isLoading}
                                 />
+                                <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                                    <Ionicons
+                                        name={showPassword ? "eye-outline" : "eye-off-outline"}
+                                        size={20}
+                                        color="#666"
+                                    />
+                                </TouchableOpacity>
                             </View>
                         </View>
 
@@ -121,12 +291,17 @@ const LoginModal = ({ visible, onClose, onLoginSuccess }: LoginModalProps) => {
                         )}
 
                         <TouchableOpacity
-                            style={styles.primaryButton}
+                            style={[styles.primaryButton, isLoading && styles.primaryButtonDisabled]}
                             onPress={handleSubmit}
+                            disabled={isLoading}
                         >
-                            <Text style={styles.primaryButtonText}>
-                                {isLogin ? 'Sign In' : 'Sign Up'}
-                            </Text>
+                            {isLoading ? (
+                                <ActivityIndicator color="#ffffff" />
+                            ) : (
+                                <Text style={styles.primaryButtonText}>
+                                    {isLogin ? 'Sign In' : 'Sign Up'}
+                                </Text>
+                            )}
                         </TouchableOpacity>
 
                         <View style={styles.divider}>
@@ -135,7 +310,7 @@ const LoginModal = ({ visible, onClose, onLoginSuccess }: LoginModalProps) => {
                             <View style={styles.dividerLine} />
                         </View>
 
-                        <TouchableOpacity style={styles.socialButton}>
+                        <TouchableOpacity style={styles.socialButton} disabled={isLoading}>
                             <Ionicons name="logo-google" size={20} color="#DB4437" />
                             <Text style={styles.socialButtonText}>Continue with Google</Text>
                         </TouchableOpacity>
@@ -144,7 +319,7 @@ const LoginModal = ({ visible, onClose, onLoginSuccess }: LoginModalProps) => {
                             <Text style={styles.switchAuthText}>
                                 {isLogin ? "Don't have an account? " : 'Already have an account? '}
                             </Text>
-                            <TouchableOpacity onPress={() => setIsLogin(!isLogin)}>
+                            <TouchableOpacity onPress={switchMode} disabled={isLoading}>
                                 <Text style={styles.switchAuthLink}>
                                     {isLogin ? 'Sign Up' : 'Sign In'}
                                 </Text>
@@ -232,6 +407,9 @@ const styles = StyleSheet.create({
         paddingVertical: 16,
         alignItems: 'center',
         marginTop: 10,
+    },
+    primaryButtonDisabled: {
+        opacity: 0.6,
     },
     primaryButtonText: {
         color: '#ffffff',

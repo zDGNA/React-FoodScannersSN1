@@ -3,18 +3,24 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert, TextInput, Modal, Scro
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import LoginModal from '../components/LoginModal';
 
 type SettingsScreenProps = {
     navigation: NativeStackNavigationProp<any>;
 };
+
 const SettingsScreen = ({ navigation }: SettingsScreenProps) => {
-    // User data - Mock (nanti dari context/state management)
+    // Guest mode - TODO: Nanti ganti dengan state dari AuthContext
+    const isGuest = true;
+
+    // User data
     const [user, setUser] = useState({
-        name: 'Guest User',
-        email: 'guest@foodscan.com',
-        isLoggedIn: false,
+        name: isGuest ? 'Guest User' : 'John Doe',
+        email: isGuest ? 'guest@foodscan.com' : 'john@example.com',
+        isLoggedIn: !isGuest,
     });
 
+    const [showLoginModal, setShowLoginModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [showGoalModal, setShowGoalModal] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -24,10 +30,10 @@ const SettingsScreen = ({ navigation }: SettingsScreenProps) => {
     const [dailyCalorieGoal, setDailyCalorieGoal] = useState('2000');
     const [weightGoal, setWeightGoal] = useState('70');
     const [notifications, setNotifications] = useState(true);
-    const [unitSystem, setUnitSystem] = useState('metric'); // metric or imperial
+    const [unitSystem, setUnitSystem] = useState('metric');
 
     const handleLogin = () => {
-        navigation.navigate('LoginScreen');
+        setShowLoginModal(true);
     };
 
     const handleLogout = () => {
@@ -71,6 +77,14 @@ const SettingsScreen = ({ navigation }: SettingsScreenProps) => {
         }, 1000);
     };
 
+    const handleGoalClick = () => {
+        if (isGuest) {
+            setShowLoginModal(true);
+        } else {
+            setShowGoalModal(true);
+        }
+    };
+
     return (
         <SafeAreaView style={styles.container}>
             <ScrollView showsVerticalScrollIndicator={false}>
@@ -90,17 +104,27 @@ const SettingsScreen = ({ navigation }: SettingsScreenProps) => {
                                 <Ionicons name="checkmark-circle" size={20} color="#4ade80" />
                             </View>
                         )}
+                        {isGuest && (
+                            <View style={styles.guestBadge}>
+                                <Ionicons name="eye-outline" size={16} color="#666" />
+                            </View>
+                        )}
                     </View>
                     <Text style={styles.userName}>{user.name}</Text>
                     <Text style={styles.userEmail}>{user.email}</Text>
 
-                    {!user.isLoggedIn ? (
-                        <TouchableOpacity
-                            style={styles.loginButton}
-                            onPress={handleLogin}
-                        >
-                            <Text style={styles.loginButtonText}>Login to Continue</Text>
-                        </TouchableOpacity>
+                    {isGuest ? (
+                        <>
+                            <Text style={styles.guestDescription}>
+                                You're browsing as a guest
+                            </Text>
+                            <TouchableOpacity
+                                style={styles.loginButton}
+                                onPress={handleLogin}
+                            >
+                                <Text style={styles.loginButtonText}>Login to Continue</Text>
+                            </TouchableOpacity>
+                        </>
                     ) : (
                         <TouchableOpacity
                             style={styles.editProfileButton}
@@ -114,76 +138,192 @@ const SettingsScreen = ({ navigation }: SettingsScreenProps) => {
 
                 {/* Health Goals Section */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Health Goals</Text>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>Health Goals</Text>
+                        {isGuest && (
+                            <View style={styles.lockedBadge}>
+                                <Ionicons name="lock-closed" size={12} color="#999" />
+                                <Text style={styles.lockedText}>Locked</Text>
+                            </View>
+                        )}
+                    </View>
 
                     <TouchableOpacity
-                        style={styles.settingItem}
-                        onPress={() => setShowGoalModal(true)}
+                        style={[
+                            styles.settingItem,
+                            isGuest && styles.settingItemDisabled
+                        ]}
+                        onPress={handleGoalClick}
+                        disabled={isGuest}
                     >
                         <View style={styles.settingItemLeft}>
-                            <View style={[styles.settingIcon, { backgroundColor: '#fef3c7' }]}>
-                                <Ionicons name="flame" size={24} color="#f59e0b" />
+                            <View style={[
+                                styles.settingIcon,
+                                { backgroundColor: isGuest ? '#f5f5f5' : '#fef3c7' }
+                            ]}>
+                                <Ionicons
+                                    name="flame"
+                                    size={24}
+                                    color={isGuest ? "#ccc" : "#f59e0b"}
+                                />
                             </View>
                             <View style={styles.settingText}>
-                                <Text style={styles.settingLabel}>Daily Calorie Goal</Text>
-                                <Text style={styles.settingValue}>{dailyCalorieGoal} kcal</Text>
+                                <Text style={[
+                                    styles.settingLabel,
+                                    isGuest && styles.settingLabelDisabled
+                                ]}>
+                                    Daily Calorie Goal
+                                </Text>
+                                <Text style={[
+                                    styles.settingValue,
+                                    isGuest && styles.settingValueDisabled
+                                ]}>
+                                    {isGuest ? '-- kcal' : `${dailyCalorieGoal} kcal`}
+                                </Text>
                             </View>
                         </View>
-                        <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
+                        <Ionicons
+                            name={isGuest ? "lock-closed" : "chevron-forward"}
+                            size={20}
+                            color={isGuest ? "#ccc" : "#94a3b8"}
+                        />
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                        style={styles.settingItem}
-                        onPress={() => setShowGoalModal(true)}
+                        style={[
+                            styles.settingItem,
+                            isGuest && styles.settingItemDisabled
+                        ]}
+                        onPress={handleGoalClick}
+                        disabled={isGuest}
                     >
                         <View style={styles.settingItemLeft}>
-                            <View style={[styles.settingIcon, { backgroundColor: '#dbeafe' }]}>
-                                <Ionicons name="trending-down" size={24} color="#3b82f6" />
+                            <View style={[
+                                styles.settingIcon,
+                                { backgroundColor: isGuest ? '#f5f5f5' : '#dbeafe' }
+                            ]}>
+                                <Ionicons
+                                    name="trending-down"
+                                    size={24}
+                                    color={isGuest ? "#ccc" : "#3b82f6"}
+                                />
                             </View>
                             <View style={styles.settingText}>
-                                <Text style={styles.settingLabel}>Target Weight</Text>
-                                <Text style={styles.settingValue}>{weightGoal} kg</Text>
+                                <Text style={[
+                                    styles.settingLabel,
+                                    isGuest && styles.settingLabelDisabled
+                                ]}>
+                                    Target Weight
+                                </Text>
+                                <Text style={[
+                                    styles.settingValue,
+                                    isGuest && styles.settingValueDisabled
+                                ]}>
+                                    {isGuest ? '-- kg' : `${weightGoal} kg`}
+                                </Text>
                             </View>
                         </View>
-                        <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
+                        <Ionicons
+                            name={isGuest ? "lock-closed" : "chevron-forward"}
+                            size={20}
+                            color={isGuest ? "#ccc" : "#94a3b8"}
+                        />
                     </TouchableOpacity>
+
+                    {isGuest && (
+                        <View style={styles.guestHint}>
+                            <Ionicons name="information-circle-outline" size={16} color="#666" />
+                            <Text style={styles.guestHintText}>
+                                Login to set your health goals and track progress
+                            </Text>
+                        </View>
+                    )}
                 </View>
 
                 {/* Preferences Section */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Preferences</Text>
 
-                    <View style={styles.settingItem}>
+                    <View style={[
+                        styles.settingItem,
+                        isGuest && styles.settingItemDisabled
+                    ]}>
                         <View style={styles.settingItemLeft}>
-                            <View style={[styles.settingIcon, { backgroundColor: '#fce7f3' }]}>
-                                <Ionicons name="notifications" size={24} color="#ec4899" />
+                            <View style={[
+                                styles.settingIcon,
+                                { backgroundColor: isGuest ? '#f5f5f5' : '#fce7f3' }
+                            ]}>
+                                <Ionicons
+                                    name="notifications"
+                                    size={24}
+                                    color={isGuest ? "#ccc" : "#ec4899"}
+                                />
                             </View>
                             <View style={styles.settingText}>
-                                <Text style={styles.settingLabel}>Meal Reminders</Text>
-                                <Text style={styles.settingValue}>Get notified for meals</Text>
-                            </View>
-                        </View>
-                        <Switch
-                            value={notifications}
-                            onValueChange={setNotifications}
-                            trackColor={{ false: '#e0e0e0', true: '#a0b0ff' }}
-                            thumbColor={notifications ? '#082374' : '#f4f3f4'}
-                        />
-                    </View>
-
-                    <TouchableOpacity style={styles.settingItem}>
-                        <View style={styles.settingItemLeft}>
-                            <View style={[styles.settingIcon, { backgroundColor: '#e0f2fe' }]}>
-                                <Ionicons name="scale" size={24} color="#0ea5e9" />
-                            </View>
-                            <View style={styles.settingText}>
-                                <Text style={styles.settingLabel}>Unit System</Text>
-                                <Text style={styles.settingValue}>
-                                    {unitSystem === 'metric' ? 'Metric (kg, cm)' : 'Imperial (lb, in)'}
+                                <Text style={[
+                                    styles.settingLabel,
+                                    isGuest && styles.settingLabelDisabled
+                                ]}>
+                                    Meal Reminders
+                                </Text>
+                                <Text style={[
+                                    styles.settingValue,
+                                    isGuest && styles.settingValueDisabled
+                                ]}>
+                                    {isGuest ? 'Disabled for guests' : 'Get notified for meals'}
                                 </Text>
                             </View>
                         </View>
-                        <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
+                        <Switch
+                            value={notifications && !isGuest}
+                            onValueChange={setNotifications}
+                            trackColor={{ false: '#e0e0e0', true: '#a0b0ff' }}
+                            thumbColor={notifications && !isGuest ? '#082374' : '#f4f3f4'}
+                            disabled={isGuest}
+                        />
+                    </View>
+
+                    <TouchableOpacity
+                        style={[
+                            styles.settingItem,
+                            isGuest && styles.settingItemDisabled
+                        ]}
+                        disabled={isGuest}
+                    >
+                        <View style={styles.settingItemLeft}>
+                            <View style={[
+                                styles.settingIcon,
+                                { backgroundColor: isGuest ? '#f5f5f5' : '#e0f2fe' }
+                            ]}>
+                                <Ionicons
+                                    name="scale"
+                                    size={24}
+                                    color={isGuest ? "#ccc" : "#0ea5e9"}
+                                />
+                            </View>
+                            <View style={styles.settingText}>
+                                <Text style={[
+                                    styles.settingLabel,
+                                    isGuest && styles.settingLabelDisabled
+                                ]}>
+                                    Unit System
+                                </Text>
+                                <Text style={[
+                                    styles.settingValue,
+                                    isGuest && styles.settingValueDisabled
+                                ]}>
+                                    {isGuest
+                                        ? 'Login to change'
+                                        : unitSystem === 'metric' ? 'Metric (kg, cm)' : 'Imperial (lb, in)'
+                                    }
+                                </Text>
+                            </View>
+                        </View>
+                        <Ionicons
+                            name={isGuest ? "lock-closed" : "chevron-forward"}
+                            size={20}
+                            color={isGuest ? "#ccc" : "#94a3b8"}
+                        />
                     </TouchableOpacity>
                 </View>
 
@@ -222,8 +362,8 @@ const SettingsScreen = ({ navigation }: SettingsScreenProps) => {
                     </TouchableOpacity>
                 </View>
 
-                {/* Logout Button */}
-                {user.isLoggedIn && (
+                {/* Logout Button - Only show if logged in */}
+                {!isGuest && user.isLoggedIn && (
                     <TouchableOpacity
                         style={styles.logoutButton}
                         onPress={handleLogout}
@@ -237,10 +377,27 @@ const SettingsScreen = ({ navigation }: SettingsScreenProps) => {
                 <View style={styles.versionContainer}>
                     <Text style={styles.versionText}>FoodScan AI</Text>
                     <Text style={styles.versionNumber}>Version 1.0.0</Text>
+                    {isGuest && (
+                        <Text style={styles.guestModeText}>Guest Mode</Text>
+                    )}
                 </View>
 
                 <View style={{ height: 30 }} />
             </ScrollView>
+
+            {/* Login Modal */}
+            <LoginModal
+                visible={showLoginModal}
+                onClose={() => setShowLoginModal(false)}
+                onLoginSuccess={() => {
+                    console.log('Login successful!');
+                    setUser({
+                        name: 'John Doe',
+                        email: 'john@example.com',
+                        isLoggedIn: true,
+                    });
+                }}
+            />
 
             {/* Edit Profile Modal */}
             <Modal
@@ -386,6 +543,14 @@ const styles = StyleSheet.create({
         backgroundColor: '#ffffff',
         borderRadius: 12,
     },
+    guestBadge: {
+        position: 'absolute',
+        bottom: 0,
+        right: 0,
+        backgroundColor: '#f5f5f5',
+        borderRadius: 12,
+        padding: 4,
+    },
     userName: {
         fontSize: 22,
         fontWeight: 'bold',
@@ -395,6 +560,11 @@ const styles = StyleSheet.create({
     userEmail: {
         fontSize: 14,
         color: '#666',
+        marginBottom: 8,
+    },
+    guestDescription: {
+        fontSize: 13,
+        color: '#999',
         marginBottom: 15,
     },
     loginButton: {
@@ -437,11 +607,30 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
         elevation: 2,
     },
+    sectionHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 15,
+    },
     sectionTitle: {
         fontSize: 16,
         fontWeight: 'bold',
         color: '#333',
-        marginBottom: 15,
+    },
+    lockedBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#f5f5f5',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+        gap: 4,
+    },
+    lockedText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#999',
     },
     settingItem: {
         flexDirection: 'row',
@@ -450,6 +639,9 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         borderBottomWidth: 1,
         borderBottomColor: '#f5f5f5',
+    },
+    settingItemDisabled: {
+        opacity: 0.6,
     },
     settingItemLeft: {
         flexDirection: 'row',
@@ -473,9 +665,30 @@ const styles = StyleSheet.create({
         color: '#333',
         marginBottom: 2,
     },
+    settingLabelDisabled: {
+        color: '#999',
+    },
     settingValue: {
         fontSize: 13,
         color: '#666',
+    },
+    settingValueDisabled: {
+        color: '#ccc',
+    },
+    guestHint: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        backgroundColor: '#f9fafb',
+        padding: 12,
+        borderRadius: 10,
+        marginTop: 12,
+        gap: 8,
+    },
+    guestHintText: {
+        flex: 1,
+        fontSize: 12,
+        color: '#666',
+        lineHeight: 18,
     },
     logoutButton: {
         flexDirection: 'row',
@@ -510,6 +723,12 @@ const styles = StyleSheet.create({
     versionNumber: {
         fontSize: 12,
         color: '#999',
+    },
+    guestModeText: {
+        fontSize: 11,
+        color: '#ccc',
+        marginTop: 4,
+        fontStyle: 'italic',
     },
     modalOverlay: {
         flex: 1,

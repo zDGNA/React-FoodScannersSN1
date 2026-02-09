@@ -6,6 +6,7 @@ import { ProgressBar } from 'react-native-paper';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import LoginModal from '../components/LoginModal';
 
+
 type HomeScreenProps = {
     navigation: NativeStackNavigationProp<any>;
 };
