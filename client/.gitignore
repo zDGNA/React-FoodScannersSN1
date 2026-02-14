@@ -1,4 +1,10 @@
 node_modules/
+android/app/build/
+android/.gradle/
+android/app/.cxx/
+ios/build/
+ios/Pods/
+.expo/
 backend/node_modules/
 backend/ai-service/venv/
 .expo/

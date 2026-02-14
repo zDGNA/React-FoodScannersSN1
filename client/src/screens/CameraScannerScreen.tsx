@@ -10,11 +10,12 @@ import { launchImageLibrary } from 'react-native-image-picker';
 import LoginModal from '../components/LoginModal';
 import axios from 'axios';
 import FormData from 'form-data';
+import { useAuth } from '../context/AuthContext';
 
 const { width, height } = Dimensions.get('window');
 
 // API Base URL - Sesuaikan dengan setup Anda
-const API_BASE_URL = 'http://10.0.2.2:3000/api';
+import { API_BASE_URL, logApiConfig } from '../config/api';
 
 type CameraScannerScreenProps = {
     navigation: NativeStackNavigationProp<any>;
@@ -41,8 +42,9 @@ const CameraScannerScreen = ({ navigation }: CameraScannerScreenProps) => {
     const [capturedImage, setCapturedImage] = useState<string | null>(null);
     const [flashMode, setFlashMode] = useState<'off' | 'on'>('off');
 
-    // Guest mode - TODO: Nanti ganti dengan state dari AuthContext
-    const isGuest = true;
+
+    const { isLoggedIn } = useAuth();
+    const isGuest = !isLoggedIn;
 
     // Camera hooks
     const { hasPermission, requestPermission } = useCameraPermission();
@@ -52,6 +54,7 @@ const CameraScannerScreen = ({ navigation }: CameraScannerScreenProps) => {
 
     // Request camera permission on mount
     useEffect(() => {
+        logApiConfig();
         checkCameraPermission();
     }, []);
 
@@ -137,10 +140,13 @@ const CameraScannerScreen = ({ navigation }: CameraScannerScreenProps) => {
 
     const detectFood = async (imageUri: string) => {
         try {
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            console.log('🔍 Starting food detection');
+            console.log('Image URI:', imageUri);
+            console.log('API URL:', API_BASE_URL);
+
             // Create form data
             const formData = new FormData();
-
-            // Prepare image file
             const filename = imageUri.split('/').pop() || 'photo.jpg';
             const match = /\.(\w+)$/.exec(filename);
             const type = match ? `image/${match[1]}` : 'image/jpeg';
@@ -151,15 +157,18 @@ const CameraScannerScreen = ({ navigation }: CameraScannerScreenProps) => {
                 name: filename,
             } as any);
 
+            console.log('📤 Sending to:', `${API_BASE_URL}/ai/detect`);
+
             // Send to backend API
             const response = await axios.post(`${API_BASE_URL}/ai/detect`, formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
                 },
-                timeout: 30000, // 30 seconds
+                timeout: 30000,
             });
 
-            console.log('AI Detection Response:', response.data);
+            console.log('✅ Response received:', JSON.stringify(response.data, null, 2));
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
             if (response.data.success) {
                 const detection = response.data.detection;
@@ -186,16 +195,43 @@ const CameraScannerScreen = ({ navigation }: CameraScannerScreenProps) => {
                 );
             }
         } catch (error: any) {
-            console.error('Food detection error:', error);
+            console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            console.error('❌ DETECTION ERROR:');
+            console.error('Type:', error.constructor.name);
+            console.error('Message:', error.message);
+            console.error('Code:', error.code);
+
+            if (error.response) {
+                console.error('Response Status:', error.response.status);
+                console.error('Response Data:', JSON.stringify(error.response.data, null, 2));
+            }
+
+            if (error.request) {
+                console.error('Request was made but no response received');
+                console.error('Request:', error.request);
+            }
+
+            console.error('Config:', error.config);
+            console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
             let errorMessage = 'Failed to analyze image. ';
 
             if (error.code === 'ECONNABORTED') {
                 errorMessage += 'Request timed out. Please try again.';
+            } else if (error.code === 'ECONNREFUSED') {
+                errorMessage += 'Cannot connect to server. Please check:\n';
+                errorMessage += '1. Backend is running\n';
+                errorMessage += '2. IP address is correct\n';
+                errorMessage += '3. Phone and computer on same WiFi';
             } else if (error.response?.status === 503) {
                 errorMessage += 'AI service is currently unavailable.';
+            } else if (error.message.includes('Network request failed')) {
+                errorMessage += 'Network error. Please check:\n';
+                errorMessage += '1. Backend is running\n';
+                errorMessage += '2. IP address: ' + API_BASE_URL + '\n';
+                errorMessage += '3. Phone and computer on same WiFi';
             } else {
-                errorMessage += 'Please check your connection and try again.';
+                errorMessage += error.message || 'Please check your connection and try again.';
             }
 
             Alert.alert('Detection Failed', errorMessage, [
@@ -231,6 +267,47 @@ const CameraScannerScreen = ({ navigation }: CameraScannerScreenProps) => {
     const toggleFlash = () => {
         setFlashMode(flashMode === 'off' ? 'on' : 'off');
     };
+
+    // Add this function
+    const testBackendConnection = async () => {
+        try {
+            console.log('🧪 Testing backend connection...');
+            console.log('URL:', `${API_BASE_URL}/health`);
+
+            const response = await axios.get(`${API_BASE_URL}/health`, {
+                timeout: 5000,
+            });
+
+            console.log('✅ Backend is reachable!');
+            console.log('Response:', response.data);
+
+            Alert.alert(
+                'Connection Test',
+                'Backend is reachable!\n\n' + JSON.stringify(response.data, null, 2),
+                [{ text: 'OK' }]
+            );
+        } catch (error: any) {
+            console.error('❌ Backend is NOT reachable!');
+            console.error('Error:', error.message);
+            console.error('Code:', error.code);
+
+            Alert.alert(
+                'Connection Test Failed',
+                'Cannot reach backend!\n\n' +
+                'Error: ' + error.message + '\n' +
+                'Code: ' + error.code + '\n\n' +
+                'API URL: ' + API_BASE_URL,
+                [{ text: 'OK' }]
+            );
+        }
+    };
+
+    // Call it when component mounts
+    useEffect(() => {
+        logApiConfig();
+        testBackendConnection(); // Test connection
+        checkCameraPermission();
+    }, []);
 
     // If no permission, show permission screen
     if (!hasPermission) {

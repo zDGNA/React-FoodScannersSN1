@@ -8,7 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // iOS Simulator: http://localhost:3000
 // Physical Device: http://YOUR_IP:3000
 
-const API_BASE_URL = 'http://192.168.1.66:3000/api';
+import { API_BASE_URL } from '../config/api';
 
 const api = axios.create({
     baseURL: API_BASE_URL,
@@ -44,5 +44,6 @@ api.interceptors.response.use(
         return Promise.reject(error);
     }
 );
+
 
 export default api;

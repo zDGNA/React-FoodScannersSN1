@@ -4,20 +4,19 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import LoginModal from '../components/LoginModal';
+import { useAuth } from '../context/AuthContext';
 
 type SettingsScreenProps = {
     navigation: NativeStackNavigationProp<any>;
 };
 
 const SettingsScreen = ({ navigation }: SettingsScreenProps) => {
-    // Guest mode - TODO: Nanti ganti dengan state dari AuthContext
-    const isGuest = true;
+    const { isLoggedIn, user } = useAuth();
+    const isGuest = !isLoggedIn;
 
-    // User data
-    const [user, setUser] = useState({
-        name: isGuest ? 'Guest User' : 'John Doe',
-        email: isGuest ? 'guest@foodscan.com' : 'john@example.com',
-        isLoggedIn: !isGuest,
+    const [userData, setUserData] = useState({
+        name: user?.full_name || user?.username || 'Guest User',
+        email: user?.email || 'guest@foodscan.com',
     });
 
     const [showLoginModal, setShowLoginModal] = useState(false);
@@ -25,8 +24,7 @@ const SettingsScreen = ({ navigation }: SettingsScreenProps) => {
     const [showGoalModal, setShowGoalModal] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
 
-    // Settings states
-    const [userName, setUserName] = useState(user.name);
+    const [userName, setUserName] = useState(user?.full_name || '');
     const [dailyCalorieGoal, setDailyCalorieGoal] = useState('2000');
     const [weightGoal, setWeightGoal] = useState('70');
     const [notifications, setNotifications] = useState(true);
@@ -45,13 +43,17 @@ const SettingsScreen = ({ navigation }: SettingsScreenProps) => {
                 {
                     text: 'Logout',
                     style: 'destructive',
-                    onPress: () => {
-                        setUser({
-                            name: 'Guest User',
-                            email: 'guest@foodscan.com',
-                            isLoggedIn: false,
-                        });
-                        Alert.alert('Success', 'You have been logged out');
+                    onPress: async () => {
+                        try {
+                            await authLogout();
+                            setUserData({
+                                name: 'Guest User',
+                                email: 'guest@foodscan.com',
+                            });
+                            Alert.alert('Success', 'You have been logged out');
+                        } catch (error) {
+                            Alert.alert('Error', 'Failed to logout');
+                        }
                     }
                 }
             ]
@@ -61,7 +63,11 @@ const SettingsScreen = ({ navigation }: SettingsScreenProps) => {
     const handleSaveProfile = () => {
         setIsLoading(true);
         setTimeout(() => {
-            setUser({ ...user, name: userName });
+            setUser({
+                ...user,
+                name: userName,
+                full_name: userName
+            });
             setIsLoading(false);
             setShowEditModal(false);
             Alert.alert('Success', 'Profile updated successfully');
@@ -88,18 +94,16 @@ const SettingsScreen = ({ navigation }: SettingsScreenProps) => {
     return (
         <SafeAreaView style={styles.container}>
             <ScrollView showsVerticalScrollIndicator={false}>
-                {/* Header */}
                 <View style={styles.header}>
                     <Text style={styles.headerTitle}>Profile & Settings</Text>
                 </View>
 
-                {/* Profile Card */}
                 <View style={styles.profileCard}>
                     <View style={styles.avatarContainer}>
                         <View style={styles.avatar}>
                             <Ionicons name="person" size={40} color="#082374" />
                         </View>
-                        {user.isLoggedIn && (
+                        {isLoggedIn && (
                             <View style={styles.verifiedBadge}>
                                 <Ionicons name="checkmark-circle" size={20} color="#4ade80" />
                             </View>
@@ -110,8 +114,8 @@ const SettingsScreen = ({ navigation }: SettingsScreenProps) => {
                             </View>
                         )}
                     </View>
-                    <Text style={styles.userName}>{user.name}</Text>
-                    <Text style={styles.userEmail}>{user.email}</Text>
+                    <Text style={styles.userName}>{isLoggedIn ? user?.full_name || 'User' : 'Guest User'}</Text>
+                    <Text style={styles.userEmail}>{isLoggedIn ? user?.email || 'user@example.com' : 'guest@foodscan.com'}</Text>
 
                     {isGuest ? (
                         <>
@@ -136,7 +140,6 @@ const SettingsScreen = ({ navigation }: SettingsScreenProps) => {
                     )}
                 </View>
 
-                {/* Health Goals Section */}
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
                         <Text style={styles.sectionTitle}>Health Goals</Text>
@@ -240,7 +243,6 @@ const SettingsScreen = ({ navigation }: SettingsScreenProps) => {
                     )}
                 </View>
 
-                {/* Preferences Section */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Preferences</Text>
 
@@ -327,7 +329,6 @@ const SettingsScreen = ({ navigation }: SettingsScreenProps) => {
                     </TouchableOpacity>
                 </View>
 
-                {/* App Section */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>App</Text>
 
@@ -362,8 +363,7 @@ const SettingsScreen = ({ navigation }: SettingsScreenProps) => {
                     </TouchableOpacity>
                 </View>
 
-                {/* Logout Button - Only show if logged in */}
-                {!isGuest && user.isLoggedIn && (
+                {!isGuest && (
                     <TouchableOpacity
                         style={styles.logoutButton}
                         onPress={handleLogout}
@@ -373,7 +373,6 @@ const SettingsScreen = ({ navigation }: SettingsScreenProps) => {
                     </TouchableOpacity>
                 )}
 
-                {/* App Version */}
                 <View style={styles.versionContainer}>
                     <Text style={styles.versionText}>FoodScan AI</Text>
                     <Text style={styles.versionNumber}>Version 1.0.0</Text>
@@ -385,21 +384,18 @@ const SettingsScreen = ({ navigation }: SettingsScreenProps) => {
                 <View style={{ height: 30 }} />
             </ScrollView>
 
-            {/* Login Modal */}
             <LoginModal
                 visible={showLoginModal}
                 onClose={() => setShowLoginModal(false)}
                 onLoginSuccess={() => {
-                    console.log('Login successful!');
                     setUser({
                         name: 'John Doe',
+                        full_name: 'John Doe',
                         email: 'john@example.com',
-                        isLoggedIn: true,
                     });
                 }}
             />
 
-            {/* Edit Profile Modal */}
             <Modal
                 visible={showEditModal}
                 transparent
@@ -437,7 +433,6 @@ const SettingsScreen = ({ navigation }: SettingsScreenProps) => {
                 </View>
             </Modal>
 
-            {/* Goals Modal */}
             <Modal
                 visible={showGoalModal}
                 transparent
@@ -795,3 +790,18 @@ const styles = StyleSheet.create({
 });
 
 export default SettingsScreen;
+
+function authLogout() {
+    return Promise.resolve();
+}
+
+function setUser(arg0: {
+    name?: string;
+    id?: number;
+    username?: string;
+    email?: string;
+    full_name?: string;
+    profile_picture?: string;
+}) {
+    console.log("User updated:", arg0);
+}

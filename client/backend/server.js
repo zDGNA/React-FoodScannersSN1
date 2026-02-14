@@ -15,7 +15,7 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this';
-const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:5000';
+const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:5001';
 
 // Middleware
 app.use(cors());

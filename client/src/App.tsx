@@ -2,6 +2,7 @@ import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { AuthProvider } from "./context/AuthContext";
 import Ionicons from "@react-native-vector-icons/ionicons";
 
 import SplashScreen from "./screens/SplashScreen";
@@ -106,9 +107,11 @@ const RootStack = () => {
 // --- Entry point
 const App = () => {
   return (
-    <NavigationContainer>
-      <RootStack />
-    </NavigationContainer>
+    <AuthProvider>
+      <NavigationContainer>
+        <RootStack />
+      </NavigationContainer>
+    </AuthProvider>
   );
 };
 

@@ -5,7 +5,7 @@ import Ionicons from "@react-native-vector-icons/ionicons";
 import { ProgressBar } from 'react-native-paper';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import LoginModal from '../components/LoginModal';
-
+import { useAuth } from '../context/AuthContext';
 
 type HomeScreenProps = {
     navigation: NativeStackNavigationProp<any>;
@@ -15,7 +15,8 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
     const [showLoginModal, setShowLoginModal] = useState(false);
 
     // Guest mode - semua data di set ke 0
-    const isGuest = true; // TODO: Nanti ganti dengan state dari AuthContext
+    const { isLoggedIn, user } = useAuth();
+    const isGuest = !isLoggedIn;
 
     const dailyCalories = isGuest ? 0 : 1847;
     const targetCalories = 2000;
@@ -48,7 +49,9 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
                 <View style={styles.header}>
                     <View style={styles.headerTop}>
                         <View>
-                            <Text style={styles.greeting}>Hello, Guest! 👋</Text>
+                            <Text style={styles.greeting}>
+                                Hello, {isGuest ? 'Guest' : user?.full_name || user?.username}! 👋
+                            </Text>
                             <Text style={styles.subtitle}>Track your nutrition today</Text>
                         </View>
                         <TouchableOpacity

@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import LoginModal from '../components/LoginModal';
+import { useAuth } from '../context/AuthContext';
 
 interface MealItem {
     id: string;
@@ -25,8 +26,9 @@ const ScanHistoryScreen = ({ navigation }: ScanHistoryScreenProps) => {
     const [selectedFilter, setSelectedFilter] = useState('All');
     const [showLoginModal, setShowLoginModal] = useState(false);
 
-    // Guest mode - TODO: Nanti ganti dengan state dari AuthContext
-    const isGuest = true;
+    // Guest mode
+    const { isLoggedIn } = useAuth();
+    const isGuest = !isLoggedIn;
 
     // Mock data - hanya ditampilkan jika bukan guest
     const historyData: MealItem[] = isGuest ? [] : [

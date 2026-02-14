@@ -5,6 +5,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Modal, TextInput, Alert, Acti
 import Ionicons from '@react-native-vector-icons/ionicons';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '../context/AuthContext';
 
 // Storage utility with fallback
 const setStorageItem = async (key: string, value: string) => {
@@ -19,7 +20,7 @@ const setStorageItem = async (key: string, value: string) => {
 // Untuk Android Emulator: http://10.0.2.2:3000
 // Untuk iOS Simulator: http://localhost:3000
 // Untuk Physical Device: http://YOUR_COMPUTER_IP:3000 (contoh: http://192.168.1.100:3000)
-const API_BASE_URL = 'http://192.168.1.66:3000/api'; // Ganti sesuai kebutuhan
+import { API_BASE_URL } from '../config/api';
 
 interface LoginModalProps {
     visible: boolean;
@@ -28,6 +29,7 @@ interface LoginModalProps {
 }
 
 const LoginModal = ({ visible, onClose, onLoginSuccess }: LoginModalProps) => {
+    const { login } = useAuth();
     const [isLogin, setIsLogin] = useState(true);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -74,6 +76,7 @@ const LoginModal = ({ visible, onClose, onLoginSuccess }: LoginModalProps) => {
             });
 
             if (response.data.success) {
+                await login(response.data.token, response.data.user);
                 // Save token
                 await AsyncStorage.setItem('authToken', response.data.token);
                 await AsyncStorage.setItem('userData', JSON.stringify(response.data.user));
@@ -123,6 +126,7 @@ const LoginModal = ({ visible, onClose, onLoginSuccess }: LoginModalProps) => {
             });
 
             if (response.data.success) {
+                await login(response.data.token, response.data.user);
                 // Save token
                 await AsyncStorage.setItem('authToken', response.data.token);
                 await AsyncStorage.setItem('userData', JSON.stringify(response.data.user));
